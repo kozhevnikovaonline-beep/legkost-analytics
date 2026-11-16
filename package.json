@@ -1,0 +1,28 @@
+{
+  "name": "legkost-analytics",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "«ЛЁГКОСТЬ · Аналитика» — демо-админка со сквозной аналитикой для Telegram Mini App онлайн-школы",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "stats": "node scripts/stats.ts"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "date-fns": "^4.4.0",
+    "zod": "^4.6.7"
+  }
+}
