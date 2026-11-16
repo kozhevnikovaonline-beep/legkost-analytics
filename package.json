@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "«ЛЁГКОСТЬ · Аналитика» — демо-админка со сквозной аналитикой для Telegram Mini App онлайн-школы",
+  "description": "Онлайн-школа Алёны Ветровой — демо-админка со сквозной аналитикой для Telegram Mini App",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

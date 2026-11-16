@@ -17,8 +17,8 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <div className="flex items-center gap-3 px-5 pb-6 pt-6">
         <Logo />
         <div className="leading-tight">
-          <div className="font-display text-[15px] font-bold tracking-wide">ЛЁГКОСТЬ</div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">Аналитика</div>
+          <div className="font-display text-[13px] font-bold uppercase tracking-wide">Онлайн-школа</div>
+          <div className="text-[13px] font-semibold text-white/75">Алёны Ветровой</div>
         </div>
       </div>
 
