@@ -15,7 +15,10 @@ const READY: Record<string, ComponentType> = {
   "/marketing": lazy(() => import("@/pages/marketing/MarketingPage")),
   "/funnel": lazy(() => import("@/pages/funnel/FunnelPage")),
   "/sales": lazy(() => import("@/pages/sales/SalesPage")),
+  "/clients": lazy(() => import("@/pages/clients/ClientsPage")),
 };
+
+const ClientCardPage = lazy(() => import("@/pages/clients/ClientCardPage"));
 
 const PageFallback = () => (
   <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -38,7 +41,7 @@ export const router = createHashRouter([
       }),
       {
         path: "/clients/:id",
-        element: <PagePlaceholder page={{ title: "Карточка клиента", widgets: ["Профиль и теги", "Хронология касаний и дожимных постов", "Покупки и оплаты", "LTV"] }} />,
+        element: withSuspense(<ClientCardPage />),
       },
       {
         path: "*",

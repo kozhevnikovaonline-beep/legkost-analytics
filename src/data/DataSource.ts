@@ -4,7 +4,7 @@
  * Каждый метод = один виджет/экран = один эндпоинт будущего бэкенда (таблица в README).
  * Методы для страниц добавляются по мере их реализации (шаг 4).
  */
-import type { DailyTraffic, DataMeta, FilterOptions, FunnelBySourceRow, FunnelData, KpiSet, LeadRow, ManagerRow, PlanFact, RevenueSpendSeries, SalesBreakdown, SourceRomiRow, StallReport, TrafficRow } from "../types/dto.ts";
+import type { ClientCard, ClientQuery, ClientRow, DailyTraffic, DataMeta, Page, FilterOptions, FunnelBySourceRow, FunnelData, KpiSet, LeadRow, ManagerRow, PlanFact, RevenueSpendSeries, SalesBreakdown, SourceRomiRow, StallReport, TrafficRow } from "../types/dto.ts";
 import type { ID } from "../types/domain.ts";
 import type { Filters } from "../types/filters.ts";
 import type { MarketingKpi, SalesKpi, SummaryKpi } from "../lib/kpi.ts";
@@ -50,4 +50,10 @@ export interface DataSource {
   getSalesBreakdown(f: Filters): Promise<SalesBreakdown>;
   /** Рейтинг менеджеров — GET /api/sales/managers */
   getManagers(f: Filters): Promise<ManagerRow[]>;
+
+  // ── Клиенты ──
+  /** Клиенты с поиском, фильтрами и страницами — GET /api/clients */
+  getClients(f: Filters, q: ClientQuery): Promise<Page<ClientRow>>;
+  /** Карточка клиента: касания, события, дожимы, покупки, LTV — GET /api/clients/:id */
+  getClientById(id: ID, f: Filters): Promise<ClientCard | null>;
 }

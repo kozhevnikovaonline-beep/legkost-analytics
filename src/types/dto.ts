@@ -2,7 +2,7 @@
  * Формы ответов DataSource — то, что получает UI. Одинаковы для моков и будущего REST API.
  * Новые DTO добавляются вместе со страницами (шаг 4).
  */
-import type { FunnelStep, ID, ISODate, ISODateTime, LeadStatus, Manager, NurtureMessage, PaymentKind, PlanMetric, ProductCategory, SourceId, StallStep } from "./domain.ts";
+import type { FunnelStep, ID, ISODate, ISODateTime, LeadStatus, Manager, NurtureMessage, OrderStatus, PaymentKind, PlanMetric, ProductCategory, SourceId, StallStep } from "./domain.ts";
 import type { TrafficMetrics } from "../lib/kpi.ts";
 
 export interface DataMeta {
@@ -228,4 +228,88 @@ export interface ManagerRow {
   /** План на период: месячный план × дней / 30 */
   plan: number;
   planProgress: number | null;
+}
+
+// ── Клиенты ────────────────────────────────────────────────
+export type ClientSegment = "period" | "all";
+export type ClientSort = "createdAt" | "ltv" | "lastActivity" | "orders";
+
+export interface ClientQuery {
+  /** Пришли за период или все клиенты */
+  segment: ClientSegment;
+  search: string;
+  status: LeadStatus | "no_lead" | null;
+  tag: string | null;
+  onlyPaying: boolean;
+  sort: ClientSort;
+  desc: boolean;
+  page: number;
+  pageSize: number;
+}
+
+export interface Page<T> {
+  rows: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  /** Сводка по всей выборке (не только по странице) */
+  summary: { clients: number; paying: number; ltv: number; avgLtv: number | null };
+  /** Теги, встречающиеся в выборке, — для фильтра */
+  tags: string[];
+}
+
+export interface ClientRow {
+  userId: ID;
+  name: string;
+  username: string | null;
+  createdAt: ISODateTime;
+  sourceId: SourceId | null;
+  sourceName: string | null;
+  campaignName: string | null;
+  /** Самый дальний шаг воронки */
+  step: FunnelStep;
+  status: LeadStatus | null;
+  orders: number;
+  ltv: number;
+  lastActivityAt: ISODateTime;
+  managerName: string | null;
+  tags: string[];
+  blocked: boolean;
+}
+
+export type TimelineKind = "touch" | "event" | "nurture" | "order" | "payment";
+
+export interface TimelineItem {
+  at: ISODateTime;
+  kind: TimelineKind;
+  title: string;
+  detail: string | null;
+  /** Оттенок значка: позитивное событие, негативное, нейтральное */
+  tone: "positive" | "negative" | "neutral" | "accent";
+}
+
+export interface ClientOrder {
+  orderId: ID;
+  productName: string;
+  planLabel: string;
+  createdAt: ISODateTime;
+  amount: number;
+  discountRub: number;
+  paid: number;
+  status: OrderStatus;
+  installmentMonths: number | null;
+  managerName: string | null;
+  isRepeat: boolean;
+}
+
+export interface ClientCard {
+  row: ClientRow;
+  tgUserId: number;
+  firstTouch: { sourceName: string; campaignName: string | null; adName: string | null; at: ISODateTime } | null;
+  lastTouch: { sourceName: string; campaignName: string | null; adName: string | null; at: ISODateTime } | null;
+  steps: { step: FunnelStep; at: ISODateTime | null }[];
+  orders: ClientOrder[];
+  firstPaidAt: ISODateTime | null;
+  nurture: { sent: number; clicked: number; converted: number };
+  timeline: TimelineItem[];
 }

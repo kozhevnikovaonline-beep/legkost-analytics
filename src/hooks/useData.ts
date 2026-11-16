@@ -46,3 +46,14 @@ export const useFunnelBySource = () => useWidget("funnel-by-source", (f) => data
 export const useSalesKpis = () => useWidget("sales-kpis", (f) => dataSource.getSalesKpis(f));
 export const useSalesBreakdown = () => useWidget("sales-breakdown", (f) => dataSource.getSalesBreakdown(f));
 export const useManagers = () => useWidget("managers", (f) => dataSource.getManagers(f));
+
+/** Клиенты: запрос зависит и от глобальных фильтров, и от параметров таблицы */
+export function useClients(q: import("../types/dto.ts").ClientQuery) {
+  const f = useCurrentFilters();
+  return useQuery({ queryKey: ["clients", f, q], queryFn: () => dataSource.getClients(f, q), placeholderData: keepPreviousData });
+}
+
+export function useClient(id: string | undefined) {
+  const f = useCurrentFilters();
+  return useQuery({ queryKey: ["client", id, f.attribution], queryFn: () => dataSource.getClientById(id!, f), enabled: !!id });
+}

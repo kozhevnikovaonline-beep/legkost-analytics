@@ -1,24 +1,13 @@
 /** Drill-down: лиды объявления → карточка клиента */
 import { useNavigate } from "react-router";
 import { ChevronRight, UserX } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/widgets/EmptyState";
 import { useLeadsByAd } from "@/hooks/useData";
 import { dateTime, num, pct, rub } from "@/lib/format";
-import { LEAD_STATUS_LABELS } from "@/lib/labels";
-import { cn } from "@/lib/utils";
+import { StatusBadge } from "@/components/widgets/StatusBadge";
 import type { TrafficRow } from "@/types/dto";
-import type { LeadStatus } from "@/types/domain";
-
-const STATUS_STYLE: Record<LeadStatus, string> = {
-  new: "bg-muted text-muted-foreground",
-  warming: "bg-chart-4/15 text-chart-4",
-  offer_sent: "bg-accent text-accent-foreground",
-  won: "bg-positive/15 text-positive",
-  lost: "bg-negative/12 text-negative",
-};
 
 export function LeadsSheet({ ad, onClose }: { ad: TrafficRow | null; onClose: () => void }) {
   const q = useLeadsByAd(ad?.adId ?? null);
@@ -60,7 +49,7 @@ export function LeadsSheet({ ad, onClose }: { ad: TrafficRow | null; onClose: ()
                         {r.ltv > 0 && ` · LTV ${rub(r.ltv)}`}
                       </span>
                     </span>
-                    <Badge className={cn("border-0", STATUS_STYLE[r.status])}>{LEAD_STATUS_LABELS[r.status]}</Badge>
+                    <StatusBadge status={r.status} />
                     <ChevronRight className="size-4 text-muted-foreground" />
                   </button>
                 </li>

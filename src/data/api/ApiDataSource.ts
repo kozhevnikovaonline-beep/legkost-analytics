@@ -6,7 +6,7 @@
  */
 import { z } from "zod";
 import type { DataSource } from "../DataSource.ts";
-import type { DailyTraffic, DataMeta, FilterOptions, FunnelBySourceRow, FunnelData, KpiSet, LeadRow, ManagerRow, PlanFact, RevenueSpendSeries, SalesBreakdown, SourceRomiRow, StallReport, TrafficRow } from "../../types/dto.ts";
+import type { ClientCard, ClientQuery, ClientRow, DailyTraffic, DataMeta, Page, FilterOptions, FunnelBySourceRow, FunnelData, KpiSet, LeadRow, ManagerRow, PlanFact, RevenueSpendSeries, SalesBreakdown, SourceRomiRow, StallReport, TrafficRow } from "../../types/dto.ts";
 import type { ID } from "../../types/domain.ts";
 import type { Filters } from "../../types/filters.ts";
 import { FUNNEL_STEPS } from "../../types/domain.ts";
@@ -122,6 +122,34 @@ const managersSchema = z.array(
   }),
 );
 
+const leadStatus = z.enum(["new", "warming", "offer_sent", "won", "lost"]);
+const clientRowSchema = z.object({
+  userId: z.string(), name: z.string(), username: z.string().nullable(), createdAt: z.string(), sourceId: sourceId.nullable(), sourceName: z.string().nullable(),
+  campaignName: z.string().nullable(), step: funnelStepEnum, status: leadStatus.nullable(), orders: z.number(), ltv: z.number(), lastActivityAt: z.string(),
+  managerName: z.string().nullable(), tags: z.array(z.string()), blocked: z.boolean(),
+});
+const clientsPageSchema = z.object({
+  rows: z.array(clientRowSchema), total: z.number(), page: z.number(), pageSize: z.number(),
+  summary: z.object({ clients: z.number(), paying: z.number(), ltv: z.number(), avgLtv: num }), tags: z.array(z.string()),
+});
+const touchInfo = z.object({ sourceName: z.string(), campaignName: z.string().nullable(), adName: z.string().nullable(), at: z.string() }).nullable();
+const clientCardSchema = z
+  .object({
+    row: clientRowSchema,
+    tgUserId: z.number(),
+    firstTouch: touchInfo,
+    lastTouch: touchInfo,
+    steps: z.array(z.object({ step: funnelStepEnum, at: z.string().nullable() })),
+    orders: z.array(z.object({
+      orderId: z.string(), productName: z.string(), planLabel: z.string(), createdAt: z.string(), amount: z.number(), discountRub: z.number(), paid: z.number(),
+      status: z.enum(["created", "paid", "installment", "refunded", "cancelled"]), installmentMonths: z.number().nullable(), managerName: z.string().nullable(), isRepeat: z.boolean(),
+    })),
+    firstPaidAt: z.string().nullable(),
+    nurture: z.object({ sent: z.number(), clicked: z.number(), converted: z.number() }),
+    timeline: z.array(z.object({ at: z.string(), kind: z.enum(["touch", "event", "nurture", "order", "payment"]), title: z.string(), detail: z.string().nullable(), tone: z.enum(["positive", "negative", "neutral", "accent"]) })),
+  })
+  .nullable();
+
 export class ApiDataSource implements DataSource {
   private baseUrl: string;
 
@@ -208,5 +236,15 @@ export class ApiDataSource implements DataSource {
 
   getManagers(f: Filters): Promise<ManagerRow[]> {
     return this.get("/api/sales/managers", managersSchema, this.q(f));
+  }
+
+  getClients(f: Filters, q: ClientQuery): Promise<Page<ClientRow>> {
+    const params = this.q(f);
+    for (const [k, v] of Object.entries(q)) if (v !== null && v !== "") params.set(k, String(v));
+    return this.get("/api/clients", clientsPageSchema, params);
+  }
+
+  getClientById(id: ID, f: Filters): Promise<ClientCard | null> {
+    return this.get(`/api/clients/${encodeURIComponent(id)}`, clientCardSchema, this.q(f));
   }
 }

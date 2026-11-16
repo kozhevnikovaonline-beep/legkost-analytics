@@ -1,6 +1,6 @@
 /** Реализация DataSource на сгенерированных данных: фильтрует «базу» и считает метрики через lib/metrics */
 import type { DataSource } from "../DataSource.ts";
-import type { DailyPoint, DailyTraffic, DataMeta, FilterOptions, FunnelBySourceRow, FunnelData, KpiSet, KpiValue, LeadRow, ManagerRow, PlanFact, PlanFactRow, RevenueSpendSeries, SalesBreakdown, SourceRomiRow, StallReport, TrafficRow } from "../../types/dto.ts";
+import type { ClientCard, ClientQuery, ClientRow, DailyPoint, DailyTraffic, Page, DataMeta, FilterOptions, FunnelBySourceRow, FunnelData, KpiSet, KpiValue, LeadRow, ManagerRow, PlanFact, PlanFactRow, RevenueSpendSeries, SalesBreakdown, SourceRomiRow, StallReport, TrafficRow } from "../../types/dto.ts";
 import type { Filters } from "../../types/filters.ts";
 import type { ID, PlanMetric, SourceId } from "../../types/domain.ts";
 import { FUNNEL_STEPS } from "../../types/domain.ts";
@@ -9,6 +9,7 @@ import { avgCheck, change, cr, funnel, median, planProgress, romi, runRate, safe
 import { previousRange, type Range } from "../../lib/period.ts";
 import { mskDay, mskMonth } from "../../lib/dates.ts";
 import { getDataset } from "./db.ts";
+import { clientCard, listClients } from "./clients.ts";
 import { addDays, diffDays } from "../../lib/dates.ts";
 import { addTraffic, bucketDays, bucketize, buildIndex, daysInMonth, dailyTotals, dailyTraffic, emptyTraffic, funnelCohort, monthFact, NEXT_OF, paymentsByKind, salesByManager, salesByProduct, salesTotals, Scope, stalls, sumTotals, trafficByAd, type Index, type TrafficAgg } from "./engine.ts";
 
@@ -295,5 +296,16 @@ export class MockDataSource implements DataSource {
         };
       })
       .sort((a, b) => b.revenue - a.revenue);
+  }
+
+  // ── Клиенты ──
+  async getClients(f: Filters, q: ClientQuery): Promise<Page<ClientRow>> {
+    const idx = await this.ready();
+    return listClients(idx, f, q);
+  }
+
+  async getClientById(id: ID, f: Filters): Promise<ClientCard | null> {
+    const idx = await this.ready();
+    return clientCard(idx, f, id);
   }
 }

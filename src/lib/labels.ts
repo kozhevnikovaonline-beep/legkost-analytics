@@ -4,7 +4,7 @@ import type { FunnelStep, LeadStatus, OrderStatus, ProductCategory } from "../ty
 export const FUNNEL_LABELS: Record<FunnelStep, string> = {
   click: "Клик",
   bot_start: "Старт бота",
-  webapp_open: "Открыл Web App",
+  webapp_open: "Открытие Web App",
   lead: "Лид",
   lesson_1: "Урок 1",
   lesson_2: "Урок 2",
