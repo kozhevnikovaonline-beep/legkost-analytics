@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+/* Шрифты — как в Mini App «ЛЁГКОСТЬ» */
+@font-face{font-family:"Manrope";font-weight:400 800;font-display:swap;src:url(../assets/fonts/manrope-xn7gYHE41ni1AdIRggOxSuXd.woff2) format("woff2");unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:"Manrope";font-weight:400 800;font-display:swap;src:url(../assets/fonts/manrope-xn7gYHE41ni1AdIRggexSg.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Unbounded";font-weight:600 800;font-display:swap;src:url(../assets/fonts/unbounded-Yq6W-LOTXCb04q32xlpwv8ZfrxE.woff2) format("woff2");unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:"Unbounded";font-weight:600 800;font-display:swap;src:url(../assets/fonts/unbounded-Yq6W-LOTXCb04q32xlpwu8Zf.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+
+@custom-variant dark (&:is(.dark *));
+
+/* Палитра приложения: розовый #FF2E8A / #DB1068, салатовый #C6FF4A, сливовый градиент первого экрана */
+:root {
+  --radius: 0.75rem;
+  --background: #F7F4F6;
+  --foreground: #1A1220;
+  --card: #FFFFFF;
+  --card-foreground: #1A1220;
+  --popover: #FFFFFF;
+  --popover-foreground: #1A1220;
+  --primary: #DB1068;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F1EAEE;
+  --secondary-foreground: #2A1C2A;
+  --muted: #F1EAEE;
+  --muted-foreground: #6E6170;
+  --accent: #FCE7F1;
+  --accent-foreground: #8A0B44;
+  --destructive: #E5484D;
+  --border: #E8DEE4;
+  --input: #E1D5DC;
+  --ring: #FF2E8A;
+  --lime: #C6FF4A;
+  --lime-ink: #5E8A00;
+  --positive: #1F9D55;
+  --negative: #E5484D;
+  --chart-1: #FF2E8A;
+  --chart-2: #8FC21B;
+  --chart-3: #6D2E5B;
+  --chart-4: #FF9A62;
+  --chart-5: #3BB7A7;
+  --chart-6: #9B8AA0;
+  --hero-grad: radial-gradient(130% 85% at 88% 0%, rgba(255, 46, 138, 0.42), transparent 62%),
+    radial-gradient(90% 70% at -10% 105%, rgba(255, 46, 138, 0.2), transparent 60%),
+    linear-gradient(165deg, #2B1426 0%, #1A111C 55%, #120D14 100%);
+}
+
+.dark {
+  --background: #0E0B0F;
+  --foreground: #F4EEF2;
+  --card: #19121B;
+  --card-foreground: #F4EEF2;
+  --popover: #1E1620;
+  --popover-foreground: #F4EEF2;
+  --primary: #FF2E8A;
+  --primary-foreground: #FFFFFF;
+  --secondary: #241A26;
+  --secondary-foreground: #F4EEF2;
+  --muted: #241A26;
+  --muted-foreground: #A898A6;
+  --accent: #33192B;
+  --accent-foreground: #FFB3D3;
+  --destructive: #FF5A60;
+  --border: #2C222E;
+  --input: #3A2D3C;
+  --ring: #FF2E8A;
+  --lime-ink: #C6FF4A;
+  --positive: #3DD68C;
+  --negative: #FF6B70;
+  --chart-2: #C6FF4A;
+  --chart-3: #B76BA3;
+}
+
+@theme inline {
+  --font-sans: "Manrope", system-ui, sans-serif;
+  --font-display: "Unbounded", "Manrope", sans-serif;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-lime: var(--lime);
+  --color-lime-ink: var(--lime-ink);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  html { color-scheme: light; }
+  html.dark { color-scheme: dark; }
+  body { @apply bg-background text-foreground font-sans antialiased; font-feature-settings: "tnum" 1; }
+}
+
+@utility bg-hero { background: var(--hero-grad); }
+@utility font-display { font-family: var(--font-display); }
