@@ -4,7 +4,7 @@
  * Каждый метод = один виджет/экран = один эндпоинт будущего бэкенда (таблица в README).
  * Методы для страниц добавляются по мере их реализации (шаг 4).
  */
-import type { DailyTraffic, DataMeta, FilterOptions, FunnelData, KpiSet, LeadRow, PlanFact, RevenueSpendSeries, SourceRomiRow, TrafficRow } from "../types/dto.ts";
+import type { DailyTraffic, DataMeta, FilterOptions, FunnelBySourceRow, FunnelData, KpiSet, LeadRow, PlanFact, RevenueSpendSeries, SourceRomiRow, StallReport, TrafficRow } from "../types/dto.ts";
 import type { ID } from "../types/domain.ts";
 import type { Filters } from "../types/filters.ts";
 import type { MarketingKpi, SummaryKpi } from "../lib/kpi.ts";
@@ -36,4 +36,10 @@ export interface DataSource {
   getTrafficTable(f: Filters): Promise<TrafficRow[]>;
   /** Лиды, отнесённые к объявлению моделью атрибуции — GET /api/marketing/ads/:adId/leads */
   getLeadsByAd(f: Filters, adId: ID): Promise<LeadRow[]>;
+
+  // ── Воронка ── (сами шаги — getFunnel выше)
+  /** Где остановились и эффективность дожимных постов — GET /api/funnel/stalls */
+  getStalls(f: Filters): Promise<StallReport>;
+  /** Воронка в разрезе источников — GET /api/funnel/by-source */
+  getFunnelBySource(f: Filters): Promise<FunnelBySourceRow[]>;
 }

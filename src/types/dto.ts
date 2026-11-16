@@ -2,7 +2,7 @@
  * Формы ответов DataSource — то, что получает UI. Одинаковы для моков и будущего REST API.
  * Новые DTO добавляются вместе со страницами (шаг 4).
  */
-import type { FunnelStep, ID, ISODate, ISODateTime, LeadStatus, PlanMetric, ProductCategory, SourceId } from "./domain.ts";
+import type { FunnelStep, ID, ISODate, ISODateTime, LeadStatus, NurtureMessage, PlanMetric, ProductCategory, SourceId, StallStep } from "./domain.ts";
 import type { TrafficMetrics } from "../lib/kpi.ts";
 
 export interface DataMeta {
@@ -141,4 +141,52 @@ export interface LeadRow {
   weight: number;
   /** Выручка клиента за всё время */
   ltv: number;
+}
+
+// ── Воронка ────────────────────────────────────────────────
+/** Дожимный пост и его эффективность */
+export interface NurtureRow {
+  id: ID;
+  title: string;
+  order: number;
+  delayMinutes: number;
+  cta: NurtureMessage["cta"];
+  sent: number;
+  clicked: number;
+  /** Вернулись и перешли на следующий шаг ≤ 72 ч после поста */
+  converted: number;
+  blocked: number;
+  /** Клики / отправлено */
+  ctr: number | null;
+  /** Вернулись / отправлено */
+  cr: number | null;
+}
+
+/** Шаг, на котором клиенты останавливаются, и серия дожимов для него */
+export interface StallRow {
+  step: StallStep;
+  next: FunnelStep;
+  reached: number;
+  /** Дошли до шага, но не дальше */
+  stuck: number;
+  nurtured: number;
+  returned: number;
+  sent: number;
+  clicked: number;
+  converted: number;
+  blocked: number;
+  ctr: number | null;
+  cr: number | null;
+  messages: NurtureRow[];
+}
+
+export interface StallReport {
+  range: DateRange;
+  steps: StallRow[];
+}
+
+export interface FunnelBySourceRow {
+  sourceId: SourceId;
+  name: string;
+  steps: { step: FunnelStep; count: number; crFirst: number | null }[];
 }

@@ -8,7 +8,7 @@
  * - продукт — по заказам и оплатам; менеджер — по заказам, оплатам и лидам;
  * - шаг воронки (кросс-фильтр) — только пользователи, дошедшие до этого шага.
  */
-import type { AppEvent, Dataset, FunnelStep, ID, ISODate, Lead, Order, Payment, SourceId, Touchpoint } from "../../types/domain.ts";
+import type { AppEvent, Dataset, FunnelStep, ID, ISODate, Lead, Order, Payment, SourceId, StallStep, Touchpoint } from "../../types/domain.ts";
 import { FUNNEL_STEPS } from "../../types/domain.ts";
 import type { Attribution, Filters } from "../../types/filters.ts";
 import { attribute } from "../../lib/attribution.ts";
@@ -298,6 +298,8 @@ export interface FunnelCounts {
   counts: Record<FunnelStep, number>;
   /** Минуты между шагом и предыдущим по каждому пользователю */
   gaps: Record<FunnelStep, number[]>;
+  /** Пользователи когорты и моменты шагов, до которых они дошли подряд */
+  users: Map<ID, StepTimes>;
 }
 
 /**
@@ -309,6 +311,7 @@ export function funnelCohort(scope: Scope, r: Range): FunnelCounts {
   const counts = Object.fromEntries(FUNNEL_STEPS.map((s) => [s, 0])) as Record<FunnelStep, number>;
   const gaps = Object.fromEntries(FUNNEL_STEPS.map((s) => [s, [] as number[]])) as Record<FunnelStep, number[]>;
   const seen = new Set<ID>();
+  const users = new Map<ID, StepTimes>();
   for (const [visitorId, touches] of idx.touchesByVisitor) {
     const tp = touches.find((x) => inRange(mskDay(x.at), r) && scope.matchTouch(x));
     if (!tp || seen.has(visitorId)) continue;
@@ -328,15 +331,95 @@ export function funnelCohort(scope: Scope, r: Range): FunnelCounts {
       }
     }
     let prevAt = t(tp.at);
+    const reached: StepTimes = { click: prevAt };
+    users.set(userId, reached);
     for (const step of FUNNEL_STEPS.slice(1)) {
       const at = st[step];
       if (at === undefined) break;
+      reached[step] = at;
       counts[step]++;
       gaps[step].push(Math.max(0, (at - prevAt) / 60_000));
       prevAt = at;
     }
   }
-  return { counts, gaps };
+  return { counts, gaps, users };
+}
+
+// ── Где остановились и дожимные посты ──────────────────────
+export const STALL_STEPS: StallStep[] = ["bot_start", "webapp_open", "lead", "lesson_1", "lesson_2", "lesson_3", "order"];
+export const NEXT_OF: Record<StallStep, FunnelStep> = {
+  bot_start: "webapp_open",
+  webapp_open: "lead",
+  lead: "lesson_1",
+  lesson_1: "lesson_2",
+  lesson_2: "lesson_3",
+  lesson_3: "order",
+  order: "payment",
+};
+
+export interface NurtureAgg {
+  sent: number;
+  failed: number;
+  blocked: number;
+  clicked: number;
+  converted: number;
+}
+
+export interface StallAgg {
+  step: StallStep;
+  /** Дошли до шага */
+  reached: number;
+  /** Дошли до шага, но не до следующего — «застряли сейчас» */
+  stuck: number;
+  /** Получили хотя бы один дожим этого шага */
+  nurtured: number;
+  /** Перешли на следующий шаг благодаря дожиму */
+  returned: number;
+  messages: Map<ID, NurtureAgg>;
+}
+
+/** Остановки на шагах и эффективность дожимов для когорты воронки */
+export function stalls(scope: Scope, r: Range): StallAgg[] {
+  const { idx } = scope;
+  const { users } = funnelCohort(scope, r);
+  const msgStep = new Map(idx.ds.nurtureMessages.map((m) => [m.id, m.stallStep]));
+  const out = new Map<StallStep, StallAgg>(
+    STALL_STEPS.map((step) => [step, { step, reached: 0, stuck: 0, nurtured: 0, returned: 0, messages: new Map(idx.ds.nurtureMessages.filter((m) => m.stallStep === step).map((m) => [m.id, { sent: 0, failed: 0, blocked: 0, clicked: 0, converted: 0 }])) }]),
+  );
+  for (const st of users.values()) {
+    for (const step of STALL_STEPS) {
+      if (st[step] === undefined) continue;
+      const a = out.get(step)!;
+      a.reached++;
+      if (st[NEXT_OF[step]] === undefined) a.stuck++;
+    }
+  }
+  const nurturedBy = new Map<StallStep, Set<ID>>();
+  const returnedBy = new Map<StallStep, Set<ID>>();
+  for (const d of idx.ds.nurtureDeliveries) {
+    const st = users.get(d.userId);
+    const step = msgStep.get(d.messageId);
+    if (!st || !step) continue;
+    const m = out.get(step)!.messages.get(d.messageId)!;
+    if (d.status === "failed") {
+      m.failed++;
+      continue;
+    }
+    m.sent++;
+    if (d.status === "blocked") m.blocked++;
+    if (d.clickedAt) m.clicked++;
+    nurturedBy.set(step, (nurturedBy.get(step) ?? new Set()).add(d.userId));
+    // Возврат засчитывается, только если клиент действительно дошёл до следующего шага в этой когорте
+    if (d.convertedAt && st[NEXT_OF[step]] !== undefined) {
+      m.converted++;
+      returnedBy.set(step, (returnedBy.get(step) ?? new Set()).add(d.userId));
+    }
+  }
+  for (const a of out.values()) {
+    a.nurtured = nurturedBy.get(a.step)?.size ?? 0;
+    a.returned = returnedBy.get(a.step)?.size ?? 0;
+  }
+  return [...out.values()];
 }
 
 // ── План / факт ────────────────────────────────────────────

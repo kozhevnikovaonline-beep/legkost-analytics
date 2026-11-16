@@ -13,6 +13,7 @@ import { NAV } from "./nav";
 const READY: Record<string, ComponentType> = {
   "/": lazy(() => import("@/pages/summary/SummaryPage")),
   "/marketing": lazy(() => import("@/pages/marketing/MarketingPage")),
+  "/funnel": lazy(() => import("@/pages/funnel/FunnelPage")),
 };
 
 const PageFallback = () => (

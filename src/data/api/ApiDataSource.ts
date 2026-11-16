@@ -6,7 +6,7 @@
  */
 import { z } from "zod";
 import type { DataSource } from "../DataSource.ts";
-import type { DailyTraffic, DataMeta, FilterOptions, FunnelData, KpiSet, LeadRow, PlanFact, RevenueSpendSeries, SourceRomiRow, TrafficRow } from "../../types/dto.ts";
+import type { DailyTraffic, DataMeta, FilterOptions, FunnelBySourceRow, FunnelData, KpiSet, LeadRow, PlanFact, RevenueSpendSeries, SourceRomiRow, StallReport, TrafficRow } from "../../types/dto.ts";
 import type { ID } from "../../types/domain.ts";
 import type { Filters } from "../../types/filters.ts";
 import { FUNNEL_STEPS } from "../../types/domain.ts";
@@ -87,6 +87,21 @@ const leadRowsSchema = z.array(
   }),
 );
 
+const funnelStepEnum = z.enum(FUNNEL_STEPS as [string, ...string[]]).transform((s) => s as (typeof FUNNEL_STEPS)[number]);
+const stallStepEnum = z.enum(["bot_start", "webapp_open", "lead", "lesson_1", "lesson_2", "lesson_3", "order"]);
+const nurtureRow = z.object({
+  id: z.string(), title: z.string(), order: z.number(), delayMinutes: z.number(), cta: z.enum(["open_app", "lesson", "offer", "pay", "reviews"]),
+  sent: z.number(), clicked: z.number(), converted: z.number(), blocked: z.number(), ctr: num, cr: num,
+});
+const stallsSchema = z.object({
+  range,
+  steps: z.array(z.object({
+    step: stallStepEnum, next: funnelStepEnum, reached: z.number(), stuck: z.number(), nurtured: z.number(), returned: z.number(),
+    sent: z.number(), clicked: z.number(), converted: z.number(), blocked: z.number(), ctr: num, cr: num, messages: z.array(nurtureRow),
+  })),
+});
+const bySourceSchema = z.array(z.object({ sourceId, name: z.string(), steps: z.array(z.object({ step: funnelStepEnum, count: z.number(), crFirst: num })) }));
+
 export class ApiDataSource implements DataSource {
   private baseUrl: string;
 
@@ -153,5 +168,13 @@ export class ApiDataSource implements DataSource {
 
   getLeadsByAd(f: Filters, adId: ID): Promise<LeadRow[]> {
     return this.get(`/api/marketing/ads/${encodeURIComponent(adId)}/leads`, leadRowsSchema, this.q(f));
+  }
+
+  getStalls(f: Filters): Promise<StallReport> {
+    return this.get("/api/funnel/stalls", stallsSchema, this.q(f));
+  }
+
+  getFunnelBySource(f: Filters): Promise<FunnelBySourceRow[]> {
+    return this.get("/api/funnel/by-source", bySourceSchema, this.q(f));
   }
 }

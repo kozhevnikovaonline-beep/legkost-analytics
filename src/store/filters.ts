@@ -36,6 +36,7 @@ interface FiltersActions {
   toggle(key: ListKey, id: ID): void;
   setFunnelStep(step: FunnelStep | null): void;
   clear(key: ListKey | "funnelStep"): void;
+  /** Снять слайсеры и кросс-фильтры (период остаётся) */
   reset(): void;
   apply(f: Filters): void;
 }
@@ -66,7 +67,8 @@ export const useFilters = create<FiltersStore>()((set, get) => ({
   },
   setFunnelStep: (funnelStep) => set({ funnelStep }),
   clear: (key) => set(key === "funnelStep" ? { funnelStep: null } : ({ [key]: [] } as Partial<Filters>)),
-  reset: () => set(defaultFilters()),
+  // «Сбросить всё» снимает слайсеры и кросс-фильтры; период, сравнение и атрибуция остаются
+  reset: () => set({ sourceIds: [], campaignIds: [], adIds: [], productIds: [], managerIds: [], funnelStep: null }),
   apply: (f) => set(f.preset === "custom" ? f : { ...f, ...presetRange(f.preset, mskToday()) }),
 }));
 

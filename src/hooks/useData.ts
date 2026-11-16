@@ -39,3 +39,6 @@ export function useLeadsByAd(adId: string | null) {
   const f = useCurrentFilters();
   return useQuery({ queryKey: ["leads-by-ad", adId, f], queryFn: () => dataSource.getLeadsByAd(f, adId!), enabled: !!adId });
 }
+
+export const useStalls = () => useWidget("stalls", (f) => dataSource.getStalls(f));
+export const useFunnelBySource = () => useWidget("funnel-by-source", (f) => dataSource.getFunnelBySource(f));

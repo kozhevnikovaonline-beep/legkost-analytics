@@ -1,16 +1,16 @@
 /** Реализация DataSource на сгенерированных данных: фильтрует «базу» и считает метрики через lib/metrics */
 import type { DataSource } from "../DataSource.ts";
-import type { DailyPoint, DailyTraffic, DataMeta, FilterOptions, FunnelData, KpiSet, KpiValue, LeadRow, PlanFact, PlanFactRow, RevenueSpendSeries, SourceRomiRow, TrafficRow } from "../../types/dto.ts";
+import type { DailyPoint, DailyTraffic, DataMeta, FilterOptions, FunnelBySourceRow, FunnelData, KpiSet, KpiValue, LeadRow, PlanFact, PlanFactRow, RevenueSpendSeries, SourceRomiRow, StallReport, TrafficRow } from "../../types/dto.ts";
 import type { Filters } from "../../types/filters.ts";
 import type { ID, PlanMetric, SourceId } from "../../types/domain.ts";
 import { FUNNEL_STEPS } from "../../types/domain.ts";
 import { MARKETING_KPIS, SUMMARY_KPIS, summaryKpis, trafficMetrics, type MarketingKpi, type SummaryKpi } from "../../lib/kpi.ts";
-import { change, funnel, median, planProgress, romi, runRate } from "../../lib/metrics.ts";
+import { change, cr, funnel, median, planProgress, romi, runRate, safeDiv } from "../../lib/metrics.ts";
 import { previousRange, type Range } from "../../lib/period.ts";
 import { mskDay, mskMonth } from "../../lib/dates.ts";
 import { getDataset } from "./db.ts";
 import { addDays, diffDays } from "../../lib/dates.ts";
-import { addTraffic, bucketDays, bucketize, buildIndex, daysInMonth, dailyTotals, dailyTraffic, emptyTraffic, funnelCohort, monthFact, Scope, sumTotals, trafficByAd, type Index, type TrafficAgg } from "./engine.ts";
+import { addTraffic, bucketDays, bucketize, buildIndex, daysInMonth, dailyTotals, dailyTraffic, emptyTraffic, funnelCohort, monthFact, NEXT_OF, Scope, stalls, sumTotals, trafficByAd, type Index, type TrafficAgg } from "./engine.ts";
 
 /** Небольшая задержка, как у настоящего API, — чтобы были видны скелетоны */
 const latency = () => new Promise((r) => setTimeout(r, 120 + Math.random() * 180));
@@ -194,5 +194,34 @@ export class MockDataSource implements DataSource {
       rows.push({ leadId: l.id, userId: u.id, name: u.firstName, username: u.username, createdAt: l.createdAt, status: l.status, weight: share, ltv: idx.lifetime.get(u.id) ?? 0 });
     }
     return rows.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  }
+
+  // ── Воронка ──
+  async getStalls(f: Filters): Promise<StallReport> {
+    const idx = await this.ready();
+    const r = rangeOf(f);
+    const msgs = new Map(idx.ds.nurtureMessages.map((m) => [m.id, m]));
+    const steps = stalls(new Scope(idx, f), r).map((a) => {
+      const messages = [...a.messages.entries()]
+        .map(([id, n]) => {
+          const m = msgs.get(id)!;
+          return { id, title: m.title, order: m.order, delayMinutes: m.delayMinutes, cta: m.cta, sent: n.sent, clicked: n.clicked, converted: n.converted, blocked: n.blocked, ctr: safeDiv(n.clicked, n.sent), cr: safeDiv(n.converted, n.sent) };
+        })
+        .sort((x, y) => x.order - y.order);
+      const tot = (k: "sent" | "clicked" | "converted" | "blocked") => messages.reduce((s, m) => s + m[k], 0);
+      const sent = tot("sent");
+      return { step: a.step, next: NEXT_OF[a.step], reached: a.reached, stuck: a.stuck, nurtured: a.nurtured, returned: a.returned, sent, clicked: tot("clicked"), converted: tot("converted"), blocked: tot("blocked"), ctr: safeDiv(tot("clicked"), sent), cr: safeDiv(tot("converted"), sent), messages };
+    });
+    return { range: r, steps };
+  }
+
+  async getFunnelBySource(f: Filters): Promise<FunnelBySourceRow[]> {
+    const idx = await this.ready();
+    const r = rangeOf(f);
+    const sources = idx.ds.sources.filter((s) => !f.sourceIds.length || f.sourceIds.includes(s.id));
+    return sources.map((s) => {
+      const { counts } = funnelCohort(new Scope(idx, { ...f, sourceIds: [s.id] }), r);
+      return { sourceId: s.id, name: s.name, steps: FUNNEL_STEPS.map((step) => ({ step, count: counts[step], crFirst: step === "click" ? null : cr(counts[step], counts.click) })) };
+    });
   }
 }
