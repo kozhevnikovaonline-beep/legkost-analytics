@@ -61,6 +61,7 @@ const translit = (s: string) => [...s.toLowerCase()].map((c) => TRANSLIT[c] ?? c
 const HOUR_WEIGHTS = [2, 1, 0.6, 0.4, 0.4, 0.6, 1.5, 3, 4, 4.5, 5, 5.5, 6.5, 6.5, 5.5, 5, 5, 5.5, 6.5, 8, 9, 9, 7, 4];
 const HOURS = HOUR_WEIGHTS.map((w, h) => ({ h, w }));
 
+const LEGACY_SOURCE_WEIGHT: Partial<Record<SourceId, number>> = { organic: 0.4, referral: 0.25, tg_seeding: 0.2, yandex_direct: 0.15 };
 const QUIZ_TYPES = ["стресс", "отёки", "гормоны", "режим"] as const;
 const LOST_REASONS = ["Нет времени", "Дорого", "Не отвечает", "Выбрала другое", "Отложила на потом"];
 
@@ -212,14 +213,14 @@ export function generateDataset(opts: GenerateOptions): Dataset {
     PRODUCTS.filter((p) => p.category !== "lead_magnet").map((p) => {
       const base: Record<string, number> = {
         "guide-desserts": 0.035, "guide-pelvic": 0.03, "guide-posture": 0.03, "guide-cellulite": 0.03, "guide-cortisol": 0.03, "guide-menu14": 0.04,
-        "marathon-edema": 0.16, club: 0.1, "course-abs": 0.05, "course-dry": 0.04, "course-postpartum": 0.05, "course-hormones": 0.04,
-        group: 0.25, personal: 0.11,
+        "marathon-edema": 0.16, club: 0.2, "course-abs": 0.05, "course-dry": 0.04, "course-postpartum": 0.05, "course-hormones": 0.04,
+        group: 0.3, personal: 0.05,
       };
       const w = (base[p.id] ?? 0) * (p.id === "personal" ? premium : p.category === "tripwire" ? 1 / premium : 1);
       return { p, w };
     });
 
-  const PLAN_WEIGHTS: Record<string, number[]> = { group: [0.45, 0.25, 0.3], personal: [0.34, 0.2, 0.26, 0.1, 0.1] };
+  const PLAN_WEIGHTS: Record<string, number[]> = { group: [0.45, 0.25, 0.3], personal: [0.3, 0.24, 0.3, 0.1, 0.06] };
 
   const pickManager = () => rng.weighted(MANAGERS, (m) => (m.id === "m-maria" ? 0.38 : m.id === "m-olga" ? 0.37 : 0.25));
 
@@ -269,7 +270,9 @@ export function generateDataset(opts: GenerateOptions): Dataset {
     }
 
     const provider = product.category === "tripwire" && rng.chance(0.3) ? "telegram_stars" : "yookassa";
-    const refundAt = rng.chance(GEN.refundRate) ? paid.at + Math.min(14 * DAY_MS, rng.lognormal(4, 2) * DAY_MS) : null;
+    // Возвращают в основном недорогие продукты; личное сопровождение — почти никогда
+    const refundP = product.category === "mentorship" ? GEN.refundRate * 0.1 : GEN.refundRate * 1.15;
+    const refundAt = rng.chance(refundP) ? paid.at + Math.min(14 * DAY_MS, rng.lognormal(4, 2) * DAY_MS) : null;
     let paidSum = 0;
     let refunded = false;
 
@@ -291,7 +294,7 @@ export function generateDataset(opts: GenerateOptions): Dataset {
       order.status = "paid";
       if (product.id === "club" && !refundAt) {
         // Подписка: продление каждый месяц, пока не ушла
-        for (let m = 1; m < 7; m++) {
+        for (let m = 1; m < GEN.clubMaxMonths; m++) {
           const at = paid.at + m * 30 * DAY_MS;
           if (at > now || rng.chance(GEN.clubChurn)) break;
           pay(at, amount, "subscription", null);
@@ -307,12 +310,82 @@ export function generateDataset(opts: GenerateOptions): Dataset {
     return { paidAt: paid.at, refunded, order };
   };
 
+  // ── Клиентки, пришедшие до начала периода ───────────────
+  // Школа работала и раньше: участницы клуба продлевают подписку, а купившие личное
+  // сопровождение доплачивают рассрочку. Это даёт регулярную выручку с первого дня периода.
+  const windowStart = mskDayStart(startDate);
+  for (let i = 0; i < GEN.legacyClub + GEN.legacyInstallments; i++) {
+    const isClub = i < GEN.legacyClub;
+    const sp = rng.weighted(SOURCES.filter((s) => ["organic", "referral", "tg_seeding", "yandex_direct"].includes(s.source.id)), (s) => LEGACY_SOURCE_WEIGHT[s.source.id] ?? 0);
+    // Для подписки — давно, для рассрочки — за 1–3 месяца до начала периода
+    // Даты продлений клуба равномерно распределены по 30-дневному циклу — выручка от подписки идёт каждый день
+    const startAt = windowStart - (isClub ? (i % 30) + 30 * rng.int(1, 8) + 4 : rng.int(15, 85)) * DAY_MS - rng.int(0, 23) * 60 * MIN;
+    const visitorId = nextId("v");
+    const tp = makeTouch(visitorId, sp, startAt - rng.int(5, 90) * MIN, 0);
+    const firstName = rng.pick(FIRST_NAMES);
+    const user: User = {
+      id: nextId("u"),
+      tgUserId: 5_100_000_000 + users.length * 7_919 + rng.int(0, 7_000),
+      firstName,
+      username: rng.chance(0.55) ? `${translit(firstName)}_${rng.int(10, 9999)}` : null,
+      createdAt: toIso(startAt),
+      managerId: null,
+      referrerId: null,
+      tags: ["с прошлого сезона"],
+      botBlockedAt: null,
+    };
+    tp.userId = user.id;
+    touchpoints.push(tp);
+    users.push(user);
+    pushEvent({ userId: user.id, at: user.createdAt, type: "bot_start", payload: { startParam: sp.utmSource } });
+    pushEvent({ userId: user.id, at: toIso(startAt + 4 * MIN), type: "webapp_open", payload: { startParam: null, platform: "ios" } });
+    pushEvent({ userId: user.id, at: toIso(startAt + 6 * MIN), type: "onboarded", payload: {} });
+    for (const n of [1, 2, 3] as const) pushEvent({ userId: user.id, at: toIso(startAt + n * DAY_MS), type: "lesson_completed", payload: { lesson: n } });
+    const lead: Lead = { id: nextId("lead"), userId: user.id, createdAt: toIso(startAt + 6 * MIN), status: "won", managerId: null, lostReason: null };
+    leads.push(lead);
+    payingUsers.push(user.id);
+
+    const orderAt = startAt + 4 * DAY_MS;
+    const product = productById.get(isClub ? "club" : "personal")!;
+    const plan = isClub ? product.plans[0]! : rng.chance(0.6) ? product.plans[4]! : product.plans[3]!;
+    const manager = isClub ? null : pickManager();
+    if (manager) lead.managerId = user.managerId = manager.id;
+    const months = plan.installmentMonths ?? 1;
+    const order: Order = {
+      id: nextId("ord"), userId: user.id, leadId: lead.id, productId: product.id, planId: plan.id, managerId: manager?.id ?? null,
+      createdAt: toIso(orderAt), listPrice: plan.priceRub, discountRub: 0, amount: plan.priceRub, status: "paid",
+      installmentMonths: isClub ? null : months, isRepeat: false,
+    };
+    orders.push(order);
+    pushEvent({ userId: user.id, at: order.createdAt, type: "checkout_opened", payload: { orderId: order.id } });
+    const payAt = orderAt + 20 * MIN;
+    if (isClub) {
+      payments.push({ id: nextId("pay"), orderId: order.id, userId: user.id, at: toIso(payAt), amount: plan.priceRub, kind: "full", installmentNo: null, provider: "yookassa" });
+      for (let m = 1; ; m++) {
+        const at = payAt + m * 30 * DAY_MS;
+        if (at > now || (at > windowStart && rng.chance(GEN.legacyClubChurn))) break;
+        payments.push({ id: nextId("pay"), orderId: order.id, userId: user.id, at: toIso(at), amount: plan.priceRub, kind: "subscription", installmentNo: null, provider: "yookassa" });
+      }
+    } else {
+      const part = Math.floor(plan.priceRub / months);
+      let paidSum = 0;
+      for (let k = 0; k < months; k++) {
+        const at = payAt + k * 30 * DAY_MS;
+        if (at > now) break;
+        const sum = k === months - 1 ? plan.priceRub - part * (months - 1) : part;
+        paidSum += sum;
+        payments.push({ id: nextId("pay"), orderId: order.id, userId: user.id, at: toIso(at), amount: sum, kind: "installment", installmentNo: k + 1, provider: "yookassa" });
+      }
+      order.status = paidSum >= plan.priceRub ? "paid" : "installment";
+    }
+  }
+
   // ── Визиты и путь клиента ────────────────────────────────
   for (let day = 0; day < GEN.days; day++) {
     const t = day / (GEN.days - 1);
     const dayDate = addDays(startDate, day);
     const growth = GEN.growthFrom + (GEN.growthTo - GEN.growthFrom) * t;
-    const visitors = Math.round(GEN.visitorsPerDay * growth * GEN.weekday[mskWeekday(dayDate)]! * rng.float(0.86, 1.14));
+    const visitors = Math.round(GEN.visitorsPerDay * growth * GEN.weekday[mskWeekday(dayDate)]! * rng.float(0.93, 1.07));
 
     for (let v = 0; v < visitors; v++) {
       const visitorId = nextId("v");
@@ -406,7 +479,8 @@ export function generateDataset(opts: GenerateOptions): Dataset {
         }
 
         // урок 3 → заказ (качество источника)
-        const ord = advance(user, "lesson_3", stalledAt, lastSp.buyQuality);
+        const buyGrowth = GEN.buyGrowthFrom + (GEN.buyGrowthTo - GEN.buyGrowthFrom) * t;
+        const ord = advance(user, "lesson_3", stalledAt, lastSp.buyQuality * buyGrowth);
         if (ord) {
           lastActivity = ord.at;
           const first = placeOrder(user, lead, lastSp, ord.at, false, []);
@@ -447,7 +521,8 @@ export function generateDataset(opts: GenerateOptions): Dataset {
   for (const ad of ads) adSource.set(ad.id, sourceProfile(campaigns.find((c) => c.id === ad.campaignId)!.sourceId));
   const clicks = new Map<string, number>();
   for (const tp of touchpoints) {
-    if (!tp.adId || !adSource.get(tp.adId)!.source.isPaid) continue;
+    // Расходы — только за период отчёта (касания клиенток прошлого сезона были раньше)
+    if (!tp.adId || !adSource.get(tp.adId)!.source.isPaid || mskDay(tp.at) < startDate) continue;
     const key = `${mskDay(tp.at)}|${tp.adId}`;
     clicks.set(key, (clicks.get(key) ?? 0) + 1);
   }
@@ -501,7 +576,7 @@ function pickIndex(rng: Rng, weights: number[]): number {
 }
 
 /**
- * План на месяц = темп прошлого месяца (в день) × дней в месяце × 1,15.
+ * План на месяц = темп прошлого месяца (в день) × дней в месяце × 1,08.
  * Для первого месяца берётся его собственный темп × 1,05.
  */
 function buildPlans(payments: Payment[], leads: Lead[], orders: Order[], startDate: ISODate, endDate: ISODate): PlanTarget[] {
@@ -510,16 +585,20 @@ function buildPlans(payments: Payment[], leads: Lead[], orders: Order[], startDa
   const months = [...daysIn.keys()];
   const fullDays = (m: string) => new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0)).getUTCDate();
   const firstPaid = new Set(payments.filter((p) => p.kind === "full" || (p.kind === "installment" && p.installmentNo === 1)).map((p) => p.orderId));
+  // Только даты периода отчёта: платежи клиенток прошлого сезона до его начала не в счёт
+  const inWindow = (iso: string) => mskDay(iso) >= startDate;
   const fact = (m: string) => ({
-    revenue: payments.filter((p) => mskMonth(p.at) === m).reduce((s, p) => s + p.amount, 0),
-    leads: leads.filter((l) => mskMonth(l.createdAt) === m).length,
-    sales: orders.filter((o) => firstPaid.has(o.id) && o.status !== "refunded" && mskMonth(o.createdAt) === m).length,
+    revenue: payments.filter((p) => mskMonth(p.at) === m && inWindow(p.at)).reduce((s, p) => s + p.amount, 0),
+    leads: leads.filter((l) => mskMonth(l.createdAt) === m && inWindow(l.createdAt)).length,
+    sales: orders.filter((o) => firstPaid.has(o.id) && o.status !== "refunded" && mskMonth(o.createdAt) === m && inWindow(o.createdAt)).length,
   });
   const plans: PlanTarget[] = [];
   months.forEach((m, i) => {
     const baseMonth = months[Math.max(0, i - 1)]!;
     const base = fact(baseMonth);
-    const scale = (fullDays(m) / daysIn.get(baseMonth)!) * (i === 0 ? 1.05 : 1.15);
+    // Первый месяц периода неполный — план только на его дни
+    const days = i === 0 ? daysIn.get(m)! : fullDays(m);
+    const scale = (days / daysIn.get(baseMonth)!) * (i === 0 ? 1.0 : 1.08);
     plans.push(
       { month: m, metric: "revenue", value: Math.round((base.revenue * scale) / 1000) * 1000 },
       { month: m, metric: "leads", value: Math.round(base.leads * scale) },

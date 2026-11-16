@@ -26,7 +26,7 @@ export const PRODUCTS: Product[] = [
     category: "course",
     plans: [
       { id: "1m", label: "1 месяц", priceRub: 1990, installmentMonths: null },
-      { id: "2m", label: "2 месяца", priceRub: 3490, installmentMonths: null },
+      { id: "2m", label: "2 месяца", priceRub: 3490, installmentMonths: 2 },
       { id: "3m", label: "3 месяца", priceRub: 4790, installmentMonths: 3 },
     ],
   },
@@ -35,8 +35,8 @@ export const PRODUCTS: Product[] = [
     name: "Личное сопровождение 1:1",
     category: "mentorship",
     plans: [
-      { id: "1m", label: "1 месяц", priceRub: 7900, installmentMonths: null },
-      { id: "2m", label: "2 месяца", priceRub: 12500, installmentMonths: null },
+      { id: "1m", label: "1 месяц", priceRub: 7900, installmentMonths: 2 },
+      { id: "2m", label: "2 месяца", priceRub: 12500, installmentMonths: 2 },
       { id: "3m", label: "3 месяца", priceRub: 18900, installmentMonths: 3 },
       { id: "4m", label: "4 месяца", priceRub: 26600, installmentMonths: 4 },
       { id: "6m", label: "6 месяцев", priceRub: 40500, installmentMonths: 6 },

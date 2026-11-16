@@ -431,7 +431,8 @@ export interface MonthFact {
 
 /** Факт по школе за месяц (без фильтров) до момента `untilDay` включительно */
 export function monthFact(idx: Index, month: string, untilDay?: ISODate): MonthFact {
-  const ok = (iso: string) => mskMonth(iso) === month && (!untilDay || mskDay(iso) <= untilDay);
+  const start = idx.ds.generatedFor.startDate;
+  const ok = (iso: string) => mskMonth(iso) === month && mskDay(iso) >= start && (!untilDay || mskDay(iso) <= untilDay);
   let revenue = 0;
   let sales = 0;
   for (const p of idx.ds.payments) {

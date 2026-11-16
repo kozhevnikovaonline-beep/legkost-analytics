@@ -26,7 +26,7 @@ export interface SourceProfile {
 export const SOURCES: SourceProfile[] = [
   {
     source: { id: "yandex_direct", name: "Яндекс Директ", isPaid: true },
-    share: 0.23, ctr: 0.012, cpc: 62, startQuality: 1.0, buyQuality: 1.0, premium: 1.0,
+    share: 0.23, ctr: 0.012, cpc: 46, startQuality: 1.0, buyQuality: 1.0, premium: 1.0,
     utmSource: "yandex", utmMedium: "cpc",
     campaigns: [
       { name: "Поиск · похудение без диет", utm: "search_bez_diet", ads: ["Минус 5 кг без голода", "3 урока бесплатно", "Худеть после родов"] },
@@ -36,7 +36,7 @@ export const SOURCES: SourceProfile[] = [
   },
   {
     source: { id: "vk_ads", name: "VK Реклама", isPaid: true },
-    share: 0.21, ctr: 0.006, cpc: 41, startQuality: 0.72, buyQuality: 0.62, premium: 0.6,
+    share: 0.21, ctr: 0.006, cpc: 36, startQuality: 0.72, buyQuality: 0.4, premium: 0.6,
     utmSource: "vk", utmMedium: "cpc",
     campaigns: [
       { name: "Лид-форма · мамы 25–40", utm: "mamy_25_40", ads: ["Тело после родов", "20 минут дома"] },
@@ -46,7 +46,7 @@ export const SOURCES: SourceProfile[] = [
   },
   {
     source: { id: "tg_ads", name: "Telegram Ads", isPaid: true },
-    share: 0.15, ctr: 0.018, cpc: 86, startQuality: 1.18, buyQuality: 1.1, premium: 1.15,
+    share: 0.15, ctr: 0.018, cpc: 62, startQuality: 1.18, buyQuality: 1.1, premium: 1.15,
     utmSource: "telegram", utmMedium: "tgads",
     campaigns: [
       { name: "Каналы о ЗОЖ", utm: "zozh_channels", ads: ["Мини-курс в боте", "Лепестки за уроки"] },
@@ -55,7 +55,7 @@ export const SOURCES: SourceProfile[] = [
   },
   {
     source: { id: "tg_seeding", name: "Посевы в TG-каналах", isPaid: true },
-    share: 0.17, ctr: 0.025, cpc: 47, startQuality: 1.25, buyQuality: 1.35, premium: 1.3,
+    share: 0.17, ctr: 0.025, cpc: 38, startQuality: 1.25, buyQuality: 1.35, premium: 1.3,
     utmSource: "telegram", utmMedium: "seeding",
     campaigns: [
       { name: "Посевы · фитнес-блогеры", utm: "fit_bloggers", ads: ["@fit_mama_life", "@zozh_kitchen", "@sport_dom"] },
@@ -127,18 +127,18 @@ export const STEP: Record<StallStep, StepProfile> = {
   lesson_1: { natural: 0.6, medianMin: 22 * 60, spread: 2.2, nurtureClick: 0.27, nurtureConvert: 0.55 },
   lesson_2: { natural: 0.65, medianMin: 24 * 60, spread: 2, nurtureClick: 0.27, nurtureConvert: 0.55 },
   /** урок 3 → заказ: умножается на качество источника */
-  lesson_3: { natural: 0.16, medianMin: 26 * 60, spread: 3, nurtureClick: 0.22, nurtureConvert: 0.45 },
+  lesson_3: { natural: 0.22, medianMin: 26 * 60, spread: 3, nurtureClick: 0.22, nurtureConvert: 0.45 },
   /** заказ → оплата: умножается на силу менеджера */
-  order: { natural: 0.62, medianMin: 25, spread: 4, nurtureClick: 0.35, nurtureConvert: 0.55 },
+  order: { natural: 0.7, medianMin: 25, spread: 4, nurtureClick: 0.35, nurtureConvert: 0.55 },
 };
 
 export const GEN = {
   days: 180,
   /** Визитёров в средний день (до сезонности и роста) */
-  visitorsPerDay: 65,
+  visitorsPerDay: 58,
   /** Рост к концу периода: множитель в первый и последний день */
   growthFrom: 0.62,
-  growthTo: 1.45,
+  growthTo: 1.7,
   /** Сезонность по дням недели, пн…вс */
   weekday: [1.1, 1.06, 1.0, 0.98, 0.88, 0.8, 0.96] as const,
   /** Вероятность старта бота после последнего касания (до множителя источника) */
@@ -146,8 +146,18 @@ export const GEN = {
   blockPerMessage: 0.025,
   refundRate: 0.07,
   repeatPurchase: 0.16,
-  clubChurn: 0.27,
-  installmentShare: 0.4,
+  /** Отток подписки клуба в месяц и сколько месяцев максимум продлевают */
+  clubChurn: 0.12,
+  clubMaxMonths: 12,
+  /** Доля рассрочек там, где она доступна: дорогие форматы почти всегда берут частями */
+  installmentShare: 0.8,
+  /** Конверсия в покупку растёт к концу периода (прогрев и дожимы дорабатываются) */
+  buyGrowthFrom: 0.85,
+  buyGrowthTo: 1.4,
   petalsDiscountShare: 0.55,
   quizShare: 0.38,
+  /** Клиентки, пришедшие до начала периода: участницы клуба и рассрочки 1:1 */
+  legacyClub: 150,
+  legacyClubChurn: 0.04,
+  legacyInstallments: 10,
 };

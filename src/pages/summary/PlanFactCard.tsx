@@ -38,7 +38,7 @@ export function PlanFactCard({ className }: { className?: string }) {
     <ChartCard
       className={className}
       title="План / факт"
-      hint="План месяца = темп прошлого месяца × 1,15. Прогноз — факт с начала месяца, растянутый на весь месяц при текущем темпе. Считается по всей школе, без фильтров."
+      hint="План месяца = темп прошлого месяца × 1,08. Прогноз — факт с начала месяца, растянутый на весь месяц при текущем темпе. Считается по всей школе, без фильтров."
       subtitle={d ? `${MONTHS_FULL[Number(d.month.slice(5, 7)) - 1]} ${d.month.slice(0, 4)} · прошло ${d.daysPassed} из ${d.daysInMonth} дн. · по всей школе` : undefined}
       loading={q.isLoading}
       error={q.error}

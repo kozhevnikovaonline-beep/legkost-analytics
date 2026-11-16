@@ -16,20 +16,23 @@ describe("генератор демо-данных", () => {
     expect(other.payments.length).not.toBe(ds.payments.length);
   });
 
-  it("180 дней истории", () => {
+  it("180 дней истории; до начала периода — только клиентки прошлого сезона", () => {
     expect(ds.generatedFor.startDate).toBe("2026-05-21");
-    expect(ds.touchpoints[0]!.at >= "2026-05-20T21:00:00.000Z").toBe(true);
+    const legacy = new Set(ds.users.filter((u) => u.tags.includes("с прошлого сезона")).map((u) => u.id));
+    expect(legacy.size).toBeGreaterThan(50);
+    const before = ds.touchpoints.filter((t) => t.at < "2026-05-20T21:00:00.000Z");
+    expect(before.every((t) => t.userId !== null && legacy.has(t.userId))).toBe(true);
     expect(ds.touchpoints.at(-1)!.at < "2026-11-16T21:00:00.000Z").toBe(true);
   });
 
-  it("объёмы по ТЗ: ~15 000 визитов, ~3 000 лидов, ~400 оплаченных заказов", () => {
+  it("объёмы: ~15 000 визитов, ~3 000 лидов, ~500–650 оплаченных заказов за период", () => {
     expect(ds.touchpoints.length).toBeGreaterThan(13_000);
     expect(ds.touchpoints.length).toBeLessThan(17_000);
     expect(ds.leads.length).toBeGreaterThan(2_600);
     expect(ds.leads.length).toBeLessThan(3_500);
-    const paid = ds.orders.filter((o) => PAID.includes(o.status)).length;
-    expect(paid).toBeGreaterThan(330);
-    expect(paid).toBeLessThan(500);
+    const paid = ds.orders.filter((o) => PAID.includes(o.status) && o.createdAt >= "2026-05-20T21:00:00.000Z").length;
+    expect(paid).toBeGreaterThan(450);
+    expect(paid).toBeLessThan(700);
   });
 
   it("возвраты 4–8% оплаченных заказов, есть рассрочки, подписки и повторные покупки", () => {
@@ -113,6 +116,19 @@ describe("генератор демо-данных", () => {
     expect(cut.events.every((e) => e.at <= iso)).toBe(true);
     expect(cut.payments.every((p) => p.at <= iso)).toBe(true);
     expect(cut.touchpoints.every((t) => t.at <= iso)).toBe(true);
+  });
+
+  it("прибыль почти каждый день в плюсе и растёт от месяца к месяцу", () => {
+    const byDay = new Map<string, number>();
+    const day = (iso: string) => new Date(Date.parse(iso) + 3 * 3600_000).toISOString().slice(0, 10);
+    for (const p of ds.payments) if (p.at >= "2026-05-20T21:00:00.000Z") byDay.set(day(p.at), (byDay.get(day(p.at)) ?? 0) + p.amount);
+    for (const c of ds.adCosts) byDay.set(c.date, (byDay.get(c.date) ?? 0) - c.spend);
+    const negative = [...byDay.values()].filter((v) => v < 0).length;
+    expect(negative / byDay.size).toBeLessThan(0.05);
+    const byMonth = new Map<string, number>();
+    for (const [d, v] of byDay) byMonth.set(d.slice(0, 7), (byMonth.get(d.slice(0, 7)) ?? 0) + v);
+    const full = ["2026-06", "2026-07", "2026-08", "2026-09", "2026-10"].map((m) => byMonth.get(m)!);
+    for (let i = 1; i < full.length; i++) expect(full[i]!).toBeGreaterThan(full[i - 1]!);
   });
 
   it("план есть на каждый месяц периода", () => {
