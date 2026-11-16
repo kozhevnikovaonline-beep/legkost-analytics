@@ -2,7 +2,7 @@
  * Формы ответов DataSource — то, что получает UI. Одинаковы для моков и будущего REST API.
  * Новые DTO добавляются вместе со страницами (шаг 4).
  */
-import type { ID, ISODate, ProductCategory, SourceId } from "./domain.ts";
+import type { FunnelStep, ID, ISODate, PlanMetric, ProductCategory, SourceId } from "./domain.ts";
 
 export interface DataMeta {
   /** Откуда данные: генератор в браузере или REST API */
@@ -25,4 +25,82 @@ export interface FilterOptions {
   ads: (Option & { campaignId: ID })[];
   products: (Option & { category: ProductCategory })[];
   managers: Option[];
+}
+
+export interface DateRange {
+  from: ISODate;
+  to: ISODate;
+}
+
+// ── Сводка ─────────────────────────────────────────────────
+export interface KpiValue {
+  value: number | null;
+  /** Значение за прошлый период (если включено сравнение) */
+  prev: number | null;
+  /** Изменение к прошлому периоду, доля */
+  change: number | null;
+  /** Точки спарклайна по корзинам периода */
+  spark: (number | null)[];
+}
+
+export interface KpiSet<K extends string = string> {
+  range: DateRange;
+  prevRange: DateRange | null;
+  /** Размер корзины спарклайна в днях */
+  bucketDays: number;
+  items: Record<K, KpiValue>;
+}
+
+export interface DailyPoint {
+  date: ISODate;
+  revenue: number;
+  spend: number;
+}
+
+export interface RevenueSpendSeries {
+  current: DailyPoint[];
+  /** Прошлый период, выровненный по дням текущего (или null без сравнения) */
+  previous: DailyPoint[] | null;
+}
+
+export interface FunnelStepRow {
+  step: FunnelStep;
+  count: number;
+  crPrev: number | null;
+  crFirst: number | null;
+  lost: number;
+  /** Медиана времени от предыдущего шага, минуты */
+  medianMinutes: number | null;
+}
+
+export interface FunnelData {
+  range: DateRange;
+  steps: FunnelStepRow[];
+}
+
+export interface SourceRomiRow {
+  sourceId: SourceId;
+  name: string;
+  spend: number;
+  revenue: number;
+  sales: number;
+  romi: number | null;
+}
+
+export interface PlanFactRow {
+  metric: PlanMetric;
+  plan: number;
+  fact: number;
+  /** Прогноз на конец месяца при текущем темпе */
+  forecast: number | null;
+  progress: number | null;
+}
+
+export interface PlanFact {
+  month: string;
+  daysPassed: number;
+  daysInMonth: number;
+  rows: PlanFactRow[];
+  /** История выручки по месяцам: план и факт */
+  history: { month: string; plan: number; fact: number }[];
 }

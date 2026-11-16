@@ -15,6 +15,7 @@ const dayYearFmt = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "sh
 const dateTimeFmt = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: TZ });
 
 const DASH = "—";
+const oneDigit = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 });
 
 export const rub = (v: number | null, compact = false): string => (v === null ? DASH : (compact ? rubCompactFmt : rubFmt).format(v));
 export const num = (v: number | null, compact = false): string => (v === null ? DASH : (compact ? numCompactFmt : numFmt).format(v));
@@ -36,4 +37,29 @@ export const dateTime = (iso: string): string => dateTimeFmt.format(new Date(iso
 export function rangeLabel(from: ISODate, to: ISODate): string {
   if (from === to) return day(from);
   return `${day(from)} — ${day(to)}`;
+}
+
+/** Значение метрики по её формату: крупные суммы — компактно («1,3 млн ₽») */
+export function metricValue(v: number | null, format: "rub" | "percent" | "number" | "ratio" | "duration"): string {
+  if (v === null || !Number.isFinite(v)) return DASH;
+  switch (format) {
+    case "rub":
+      return rub(v, Math.abs(v) >= 1_000_000);
+    case "percent":
+      return pct(v);
+    case "number":
+      return num(Math.round(v), Math.abs(v) >= 100_000);
+    case "ratio":
+      return ratio(v);
+    case "duration":
+      return duration(v);
+  }
+}
+
+/** Минуты → «35 мин», «5 ч», «2,5 дн» */
+export function duration(minutes: number | null): string {
+  if (minutes === null) return DASH;
+  if (minutes < 60) return `${Math.round(minutes)} мин`;
+  if (minutes < 48 * 60) return `${oneDigit.format(minutes / 60)} ч`;
+  return `${oneDigit.format(minutes / 1440)} дн`;
 }

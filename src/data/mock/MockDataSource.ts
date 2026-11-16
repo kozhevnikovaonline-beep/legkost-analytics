@@ -1,19 +1,37 @@
 /** Реализация DataSource на сгенерированных данных: фильтрует «базу» и считает метрики через lib/metrics */
 import type { DataSource } from "../DataSource.ts";
-import type { DataMeta, FilterOptions } from "../../types/dto.ts";
+import type { DailyPoint, DataMeta, FilterOptions, FunnelData, KpiSet, KpiValue, PlanFact, PlanFactRow, RevenueSpendSeries, SourceRomiRow } from "../../types/dto.ts";
+import type { Filters } from "../../types/filters.ts";
+import type { PlanMetric, SourceId } from "../../types/domain.ts";
+import { FUNNEL_STEPS } from "../../types/domain.ts";
+import { SUMMARY_KPIS, summaryKpis, type SummaryKpi } from "../../lib/kpi.ts";
+import { change, funnel, median, planProgress, romi, runRate } from "../../lib/metrics.ts";
+import { previousRange, type Range } from "../../lib/period.ts";
+import { mskDay, mskMonth } from "../../lib/dates.ts";
 import { getDataset } from "./db.ts";
+import { bucketDays, bucketize, buildIndex, daysInMonth, dailyTotals, funnelCohort, monthFact, Scope, sumTotals, type Index } from "./engine.ts";
 
 /** Небольшая задержка, как у настоящего API, — чтобы были видны скелетоны */
 const latency = () => new Promise((r) => setTimeout(r, 120 + Math.random() * 180));
 
+let indexPromise: Promise<Index> | null = null;
+const getIndex = () => (indexPromise ??= getDataset().then(buildIndex));
+
+const rangeOf = (f: Filters): Range => ({ from: f.from, to: f.to });
+
 export class MockDataSource implements DataSource {
+  private async ready(): Promise<Index> {
+    const [idx] = await Promise.all([getIndex(), latency()]);
+    return idx;
+  }
+
   async getMeta(): Promise<DataMeta> {
     const ds = await getDataset();
     return { kind: "mock", startDate: ds.generatedFor.startDate, endDate: ds.generatedFor.endDate, timezone: "Europe/Moscow", currency: "RUB" };
   }
 
   async getFilterOptions(): Promise<FilterOptions> {
-    const [ds] = await Promise.all([getDataset(), latency()]);
+    const { ds } = await this.ready();
     return {
       sources: ds.sources.map((s) => ({ id: s.id, name: s.name, isPaid: s.isPaid })),
       campaigns: ds.campaigns.map((c) => ({ id: c.id, name: c.name, sourceId: c.sourceId })),
@@ -21,5 +39,89 @@ export class MockDataSource implements DataSource {
       products: ds.products.filter((p) => p.category !== "lead_magnet").map((p) => ({ id: p.id, name: p.name, category: p.category })),
       managers: ds.managers.map((m) => ({ id: m.id, name: m.name })),
     };
+  }
+
+  async getKpis(f: Filters): Promise<KpiSet<SummaryKpi>> {
+    const idx = await this.ready();
+    const scope = new Scope(idx, f);
+    const r = rangeOf(f);
+    const prevR = f.compare === "previous_period" ? previousRange(r) : null;
+    const days = dailyTotals(scope, r);
+    const cur = summaryKpis(sumTotals(days.values()));
+    const prev = prevR ? summaryKpis(sumTotals(dailyTotals(scope, prevR).values())) : null;
+    const size = bucketDays(r);
+    const buckets = bucketize(days, size).map((b) => summaryKpis(b.totals));
+    const items = Object.fromEntries(
+      SUMMARY_KPIS.map((k): [SummaryKpi, KpiValue] => [
+        k,
+        { value: cur[k], prev: prev ? prev[k] : null, change: prev ? change(cur[k], prev[k]) : null, spark: buckets.map((b) => b[k]) },
+      ]),
+    ) as Record<SummaryKpi, KpiValue>;
+    return { range: r, prevRange: prevR, bucketDays: size, items };
+  }
+
+  async getRevenueSpendSeries(f: Filters): Promise<RevenueSpendSeries> {
+    const idx = await this.ready();
+    const scope = new Scope(idx, f);
+    const toPoints = (r: Range): DailyPoint[] => [...dailyTotals(scope, r).entries()].map(([date, t]) => ({ date, revenue: Math.round(t.revenue), spend: Math.round(t.spend) }));
+    const r = rangeOf(f);
+    return { current: toPoints(r), previous: f.compare === "previous_period" ? toPoints(previousRange(r)) : null };
+  }
+
+  async getFunnel(f: Filters): Promise<FunnelData> {
+    const idx = await this.ready();
+    const r = rangeOf(f);
+    const { counts, gaps } = funnelCohort(new Scope(idx, f), r);
+    const stats = funnel(FUNNEL_STEPS.map((s) => counts[s]));
+    return { range: r, steps: FUNNEL_STEPS.map((step, i) => ({ step, ...stats[i]!, medianMinutes: i === 0 ? null : median(gaps[step]) })) };
+  }
+
+  async getTopSources(f: Filters): Promise<SourceRomiRow[]> {
+    const idx = await this.ready();
+    const r = rangeOf(f);
+    // Виджет сам задаёт фильтр источника, поэтому строится без фильтров источника/кампании/объявления
+    const scope = new Scope(idx, { ...f, sourceIds: [], campaignIds: [], adIds: [] });
+    const rows = new Map<SourceId, SourceRomiRow>();
+    for (const s of idx.ds.sources.filter((x) => x.isPaid)) rows.set(s.id, { sourceId: s.id, name: s.name, spend: 0, revenue: 0, sales: 0, romi: null });
+    for (const c of idx.ds.adCosts) {
+      if (c.date < r.from || c.date > r.to) continue;
+      const row = rows.get(idx.campaignSource.get(idx.adCampaign.get(c.adId)!)!);
+      if (row) row.spend += c.spend;
+    }
+    for (const p of idx.ds.payments) {
+      const day = mskDay(p.at);
+      if (day < r.from || day > r.to) continue;
+      const order = idx.orderById.get(p.orderId)!;
+      const w = scope.userWeight(p.userId);
+      if (!w || !scope.orderOk(order)) continue;
+      const first = p.kind === "full" || (p.kind === "installment" && p.installmentNo === 1);
+      for (const sh of scope.userShares(p.userId)) {
+        const row = rows.get(sh.sourceId);
+        if (!row) continue;
+        row.revenue += p.amount * w * sh.weight;
+        if (first && order.status !== "refunded") row.sales += w * sh.weight;
+      }
+    }
+    return [...rows.values()]
+      .map((x) => ({ ...x, revenue: Math.round(x.revenue), romi: romi(x.revenue, x.spend) }))
+      .sort((a, b) => (b.romi ?? -Infinity) - (a.romi ?? -Infinity));
+  }
+
+  async getPlanFact(f: Filters): Promise<PlanFact> {
+    const idx = await this.ready();
+    const end = idx.ds.generatedFor.endDate;
+    const month = mskMonth(f.to);
+    const total = daysInMonth(month);
+    const current = month === mskMonth(end);
+    const daysPassed = current ? Number(end.slice(8, 10)) : total;
+    const fact = monthFact(idx, month, current ? end : undefined);
+    const planOf = (m: string, metric: PlanMetric) => idx.ds.plans.find((p) => p.month === m && p.metric === metric)?.value ?? 0;
+    const rows: PlanFactRow[] = (["revenue", "leads", "sales"] as const).map((metric) => {
+      const plan = planOf(month, metric);
+      return { metric, plan, fact: fact[metric], forecast: current ? runRate(fact[metric], daysPassed, total) : fact[metric], progress: planProgress(fact[metric], plan) };
+    });
+    const months = [...new Set(idx.ds.plans.map((p) => p.month))];
+    const history = months.map((m) => ({ month: m, plan: planOf(m, "revenue"), fact: monthFact(idx, m).revenue }));
+    return { month, daysPassed, daysInMonth: total, rows, history };
   }
 }
