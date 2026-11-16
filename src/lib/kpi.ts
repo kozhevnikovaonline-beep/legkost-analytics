@@ -31,3 +31,40 @@ export function summaryKpis(x: KpiInputs): Record<SummaryKpi, number | null> {
     ltvCac: m.ltvCac(ltvV, cacV),
   };
 }
+
+// ── Маркетинг ──────────────────────────────────────────────
+export interface TrafficInputs {
+  impressions: number;
+  clicks: number;
+  paidClicks: number;
+  spend: number;
+  leads: number;
+  sales: number;
+  revenue: number;
+  newCustomers: number;
+}
+
+export const MARKETING_KPIS = ["impressions", "clicks", "ctr", "cpm", "cpc", "cpl", "crClickLead"] as const;
+export type MarketingKpi = (typeof MARKETING_KPIS)[number];
+
+/** Метрики строки таблицы трафика «до денег» */
+export function trafficMetrics(x: TrafficInputs) {
+  return {
+    impressions: x.impressions,
+    clicks: x.clicks,
+    ctr: m.ctr(x.paidClicks, x.impressions),
+    spend: x.spend,
+    cpm: m.cpm(x.spend, x.impressions),
+    cpc: m.cpc(x.spend, x.paidClicks),
+    leads: x.leads,
+    // У бесплатных источников (органика, рефералы) нет расхода — CPL и CAC не считаем
+    cpl: x.spend > 0 ? m.cpl(x.spend, x.leads) : null,
+    crClickLead: m.cr(x.leads, x.clicks),
+    sales: x.sales,
+    revenue: x.revenue,
+    romi: m.romi(x.revenue, x.spend),
+    cac: x.spend > 0 ? m.cac(x.spend, x.newCustomers) : null,
+  };
+}
+
+export type TrafficMetrics = ReturnType<typeof trafficMetrics>;

@@ -1,15 +1,16 @@
 /** Реализация DataSource на сгенерированных данных: фильтрует «базу» и считает метрики через lib/metrics */
 import type { DataSource } from "../DataSource.ts";
-import type { DailyPoint, DataMeta, FilterOptions, FunnelData, KpiSet, KpiValue, PlanFact, PlanFactRow, RevenueSpendSeries, SourceRomiRow } from "../../types/dto.ts";
+import type { DailyPoint, DailyTraffic, DataMeta, FilterOptions, FunnelData, KpiSet, KpiValue, LeadRow, PlanFact, PlanFactRow, RevenueSpendSeries, SourceRomiRow, TrafficRow } from "../../types/dto.ts";
 import type { Filters } from "../../types/filters.ts";
-import type { PlanMetric, SourceId } from "../../types/domain.ts";
+import type { ID, PlanMetric, SourceId } from "../../types/domain.ts";
 import { FUNNEL_STEPS } from "../../types/domain.ts";
-import { SUMMARY_KPIS, summaryKpis, type SummaryKpi } from "../../lib/kpi.ts";
+import { MARKETING_KPIS, SUMMARY_KPIS, summaryKpis, trafficMetrics, type MarketingKpi, type SummaryKpi } from "../../lib/kpi.ts";
 import { change, funnel, median, planProgress, romi, runRate } from "../../lib/metrics.ts";
 import { previousRange, type Range } from "../../lib/period.ts";
 import { mskDay, mskMonth } from "../../lib/dates.ts";
 import { getDataset } from "./db.ts";
-import { bucketDays, bucketize, buildIndex, daysInMonth, dailyTotals, funnelCohort, monthFact, Scope, sumTotals, type Index } from "./engine.ts";
+import { addDays, diffDays } from "../../lib/dates.ts";
+import { addTraffic, bucketDays, bucketize, buildIndex, daysInMonth, dailyTotals, dailyTraffic, emptyTraffic, funnelCohort, monthFact, Scope, sumTotals, trafficByAd, type Index, type TrafficAgg } from "./engine.ts";
 
 /** Небольшая задержка, как у настоящего API, — чтобы были видны скелетоны */
 const latency = () => new Promise((r) => setTimeout(r, 120 + Math.random() * 180));
@@ -123,5 +124,75 @@ export class MockDataSource implements DataSource {
     const months = [...new Set(idx.ds.plans.map((p) => p.month))];
     const history = months.map((m) => ({ month: m, plan: planOf(m, "revenue"), fact: monthFact(idx, m).revenue }));
     return { month, daysPassed, daysInMonth: total, rows, history };
+  }
+
+  // ── Маркетинг ──
+  async getMarketingKpis(f: Filters): Promise<KpiSet<MarketingKpi>> {
+    const idx = await this.ready();
+    const scope = new Scope(idx, f);
+    const total = (r: Range) => trafficMetrics([...trafficByAd(scope, r).values()].reduce(addTraffic, emptyTraffic()));
+    const r = rangeOf(f);
+    const prevR = f.compare === "previous_period" ? previousRange(r) : null;
+    const cur = total(r);
+    const prev = prevR ? total(prevR) : null;
+    const size = bucketDays(r);
+    const sparks: ReturnType<typeof total>[] = [];
+    for (let i = 0; i <= diffDays(r.from, r.to); i += size) {
+      const to = addDays(r.from, i + size - 1);
+      sparks.push(total({ from: addDays(r.from, i), to: to > r.to ? r.to : to }));
+    }
+    const items = Object.fromEntries(
+      MARKETING_KPIS.map((k): [MarketingKpi, KpiValue] => [k, { value: cur[k], prev: prev ? prev[k] : null, change: prev ? change(cur[k], prev[k]) : null, spark: sparks.map((s) => s[k]) }]),
+    ) as Record<MarketingKpi, KpiValue>;
+    return { range: r, prevRange: prevR, bucketDays: size, items };
+  }
+
+  async getDailyTraffic(f: Filters): Promise<DailyTraffic[]> {
+    const idx = await this.ready();
+    return dailyTraffic(new Scope(idx, f), rangeOf(f)).map((d) => ({ ...d, leads: Math.round(d.leads * 10) / 10 }));
+  }
+
+  async getTrafficTable(f: Filters): Promise<TrafficRow[]> {
+    const idx = await this.ready();
+    const byAd = trafficByAd(new Scope(idx, f), rangeOf(f));
+    const sourceName = new Map(idx.ds.sources.map((s) => [s.id, s]));
+    const tree: TrafficRow[] = [];
+    for (const s of idx.ds.sources) {
+      let sAgg: TrafficAgg = emptyTraffic();
+      const campaigns: TrafficRow[] = [];
+      for (const c of idx.ds.campaigns.filter((x) => x.sourceId === s.id)) {
+        let cAgg: TrafficAgg = emptyTraffic();
+        const ads: TrafficRow[] = [];
+        for (const a of idx.ds.ads.filter((x) => x.campaignId === c.id)) {
+          const agg = byAd.get(a.id);
+          if (!agg) continue;
+          cAgg = addTraffic(cAgg, agg);
+          ads.push({ id: a.id, level: "ad", name: a.name, sourceId: s.id, campaignId: c.id, adId: a.id, isPaid: s.isPaid, metrics: trafficMetrics(agg) });
+        }
+        if (!ads.length) continue;
+        sAgg = addTraffic(sAgg, cAgg);
+        campaigns.push({ id: c.id, level: "campaign", name: c.name, sourceId: s.id, campaignId: c.id, adId: null, isPaid: s.isPaid, metrics: trafficMetrics(cAgg), children: ads });
+      }
+      if (campaigns.length) tree.push({ id: s.id, level: "source", name: sourceName.get(s.id)!.name, sourceId: s.id, campaignId: null, adId: null, isPaid: s.isPaid, metrics: trafficMetrics(sAgg), children: campaigns });
+    }
+    return tree;
+  }
+
+  async getLeadsByAd(f: Filters, adId: ID): Promise<LeadRow[]> {
+    const idx = await this.ready();
+    const r = rangeOf(f);
+    const scope = new Scope(idx, { ...f, sourceIds: [], campaignIds: [], adIds: [] });
+    const users = new Map(idx.ds.users.map((u) => [u.id, u]));
+    const rows: LeadRow[] = [];
+    for (const l of idx.ds.leads) {
+      const day = mskDay(l.createdAt);
+      if (day < r.from || day > r.to || !scope.leadOk(l)) continue;
+      const w = scope.userWeight(l.userId);
+      const share = scope.userShares(l.userId).filter((s) => s.adId === adId).reduce((s, x) => s + x.weight, 0) * w;
+      if (!share) continue;
+      const u = users.get(l.userId)!;
+      rows.push({ leadId: l.id, userId: u.id, name: u.firstName, username: u.username, createdAt: l.createdAt, status: l.status, weight: share, ltv: idx.lifetime.get(u.id) ?? 0 });
+    }
+    return rows.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   }
 }

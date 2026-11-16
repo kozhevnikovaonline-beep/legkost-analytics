@@ -12,6 +12,7 @@ import { NAV } from "./nav";
 /** Готовые страницы; остальные пока показывают заготовку */
 const READY: Record<string, ComponentType> = {
   "/": lazy(() => import("@/pages/summary/SummaryPage")),
+  "/marketing": lazy(() => import("@/pages/marketing/MarketingPage")),
 };
 
 const PageFallback = () => (

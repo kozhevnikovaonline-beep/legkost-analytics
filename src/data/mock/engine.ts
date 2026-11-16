@@ -363,3 +363,102 @@ export function monthFact(idx: Index, month: string, untilDay?: ISODate): MonthF
 export const daysInMonth = (month: string) => new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
 export const monthStartMs = (month: string) => mskDayStart(`${month}-01`);
 export { DAY_MS };
+
+// ── Маркетинг: дерево источник → кампания → объявление ─────
+export interface TrafficAgg {
+  impressions: number;
+  /** Все переходы (включая органику и рефералов) */
+  clicks: number;
+  /** Клики по платной рекламе — для CTR и CPC */
+  paidClicks: number;
+  spend: number;
+  leads: number;
+  sales: number;
+  revenue: number;
+  newCustomers: number;
+}
+
+export const emptyTraffic = (): TrafficAgg => ({ impressions: 0, clicks: 0, paidClicks: 0, spend: 0, leads: 0, sales: 0, revenue: 0, newCustomers: 0 });
+
+/**
+ * Метрики по объявлениям за период. Расход, показы и клики — напрямую по объявлению;
+ * лиды, продажи, выручка и новые клиенты распределяются по объявлениям моделью атрибуции.
+ * Строки, не попадающие под фильтр источника/кампании/объявления, отбрасываются.
+ */
+export function trafficByAd(scope: Scope, r: Range): Map<ID, TrafficAgg> {
+  const { idx } = scope;
+  // Веса пользователей без фильтров касаний: разбивка по объявлениям делается здесь же
+  const loose = new Scope(idx, { ...scope.f, sourceIds: [], campaignIds: [], adIds: [] });
+  const byAd = new Map<ID, TrafficAgg>();
+  const row = (adId: ID) => {
+    let a = byAd.get(adId);
+    if (!a) byAd.set(adId, (a = emptyTraffic()));
+    return a;
+  };
+  const okAd = (adId: ID | null): adId is ID => adId !== null && scope.adOk(adId);
+  const paidSources = new Set(idx.ds.sources.filter((s) => s.isPaid).map((s) => s.id));
+
+  for (const c of idx.ds.adCosts) {
+    if (c.date < r.from || c.date > r.to || !okAd(c.adId)) continue;
+    const a = row(c.adId);
+    a.impressions += c.impressions;
+    a.spend += c.spend;
+  }
+  for (const tp of idx.ds.touchpoints) {
+    if (!inRange(mskDay(tp.at), r) || !okAd(tp.adId)) continue;
+    const a = row(tp.adId);
+    a.clicks += 1;
+    if (paidSources.has(tp.sourceId)) a.paidClicks += 1;
+  }
+  const spread = (userId: ID, value: number, key: keyof TrafficAgg) => {
+    const w = loose.userWeight(userId);
+    if (!w) return;
+    for (const sh of loose.userShares(userId)) if (okAd(sh.adId)) row(sh.adId)[key] += value * w * sh.weight;
+  };
+  for (const l of idx.ds.leads) if (inRange(mskDay(l.createdAt), r) && scope.leadOk(l)) spread(l.userId, 1, "leads");
+  for (const p of idx.ds.payments) {
+    if (!inRange(mskDay(p.at), r)) continue;
+    const order = idx.orderById.get(p.orderId)!;
+    if (!scope.orderOk(order)) continue;
+    spread(p.userId, p.amount, "revenue");
+    if (isFirstPayment(p) && order.status !== "refunded") spread(p.userId, 1, "sales");
+  }
+  for (const [userId, firstAt] of idx.firstPaidAt) {
+    if (!inRange(mskDay(firstAt), r)) continue;
+    const first = idx.ordersByUser.get(userId)?.find((o) => PAID.includes(o.status));
+    if (first && scope.orderOk(first)) spread(userId, 1, "newCustomers");
+  }
+  return byAd;
+}
+
+export function addTraffic(a: TrafficAgg, b: TrafficAgg): TrafficAgg {
+  return {
+    impressions: a.impressions + b.impressions,
+    clicks: a.clicks + b.clicks,
+    paidClicks: a.paidClicks + b.paidClicks,
+    spend: a.spend + b.spend,
+    leads: a.leads + b.leads,
+    sales: a.sales + b.sales,
+    revenue: a.revenue + b.revenue,
+    newCustomers: a.newCustomers + b.newCustomers,
+  };
+}
+
+/** Клики, расход и лиды по дням (для графика маркетинга) */
+export function dailyTraffic(scope: Scope, r: Range): { date: ISODate; clicks: number; spend: number; leads: number }[] {
+  const days = new Map<ISODate, { clicks: number; spend: number; leads: number }>();
+  for (let d = r.from; d <= r.to; d = addDays(d, 1)) days.set(d, { clicks: 0, spend: 0, leads: 0 });
+  for (const tp of scope.idx.ds.touchpoints) {
+    const row = days.get(mskDay(tp.at));
+    if (row && scope.matchTouch(tp)) row.clicks += 1;
+  }
+  for (const c of scope.idx.ds.adCosts) {
+    const row = days.get(c.date);
+    if (row && scope.adOk(c.adId)) row.spend += c.spend;
+  }
+  for (const l of scope.idx.ds.leads) {
+    const row = days.get(mskDay(l.createdAt));
+    if (row && scope.leadOk(l)) row.leads += scope.userWeight(l.userId);
+  }
+  return [...days.entries()].map(([date, v]) => ({ date, ...v }));
+}

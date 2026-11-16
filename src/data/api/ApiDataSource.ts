@@ -6,10 +6,11 @@
  */
 import { z } from "zod";
 import type { DataSource } from "../DataSource.ts";
-import type { DataMeta, FilterOptions, FunnelData, KpiSet, PlanFact, RevenueSpendSeries, SourceRomiRow } from "../../types/dto.ts";
+import type { DailyTraffic, DataMeta, FilterOptions, FunnelData, KpiSet, LeadRow, PlanFact, RevenueSpendSeries, SourceRomiRow, TrafficRow } from "../../types/dto.ts";
+import type { ID } from "../../types/domain.ts";
 import type { Filters } from "../../types/filters.ts";
 import { FUNNEL_STEPS } from "../../types/domain.ts";
-import { SUMMARY_KPIS, type SummaryKpi } from "../../lib/kpi.ts";
+import { MARKETING_KPIS, SUMMARY_KPIS, type MarketingKpi, type SummaryKpi } from "../../lib/kpi.ts";
 import { filtersToQuery } from "../../lib/urlFilters.ts";
 
 const sourceId = z.enum(["yandex_direct", "vk_ads", "tg_ads", "tg_seeding", "organic", "referral"]);
@@ -54,6 +55,37 @@ const planFactSchema = z.object({
   rows: z.array(z.object({ metric: z.enum(["revenue", "leads", "sales"]), plan: z.number(), fact: z.number(), forecast: num, progress: num })),
   history: z.array(z.object({ month: z.string(), plan: z.number(), fact: z.number() })),
 });
+
+const marketingKpiSchema = z.object({
+  range,
+  prevRange: range.nullable(),
+  bucketDays: z.number(),
+  items: z.object(Object.fromEntries(MARKETING_KPIS.map((k) => [k, kpiValue])) as Record<MarketingKpi, typeof kpiValue>),
+});
+const dailyTrafficSchema = z.array(z.object({ date: isoDate, clicks: z.number(), spend: z.number(), leads: z.number() }));
+const trafficMetricsSchema = z.object({
+  impressions: z.number(), clicks: z.number(), ctr: num, spend: z.number(), cpm: num, cpc: num, leads: z.number(),
+  cpl: num, crClickLead: num, sales: z.number(), revenue: z.number(), romi: num, cac: num,
+});
+const trafficRowSchema: z.ZodType<TrafficRow> = z.lazy(() =>
+  z.object({
+    id: z.string(),
+    level: z.enum(["source", "campaign", "ad"]),
+    name: z.string(),
+    sourceId,
+    campaignId: z.string().nullable(),
+    adId: z.string().nullable(),
+    isPaid: z.boolean(),
+    metrics: trafficMetricsSchema,
+    children: z.array(trafficRowSchema).optional(),
+  }),
+);
+const leadRowsSchema = z.array(
+  z.object({
+    leadId: z.string(), userId: z.string(), name: z.string(), username: z.string().nullable(), createdAt: z.string(),
+    status: z.enum(["new", "warming", "offer_sent", "won", "lost"]), weight: z.number(), ltv: z.number(),
+  }),
+);
 
 export class ApiDataSource implements DataSource {
   private baseUrl: string;
@@ -105,5 +137,21 @@ export class ApiDataSource implements DataSource {
 
   getPlanFact(f: Filters): Promise<PlanFact> {
     return this.get("/api/summary/plan-fact", planFactSchema, this.q(f));
+  }
+
+  getMarketingKpis(f: Filters): Promise<KpiSet<MarketingKpi>> {
+    return this.get("/api/marketing/kpis", marketingKpiSchema, this.q(f));
+  }
+
+  getDailyTraffic(f: Filters): Promise<DailyTraffic[]> {
+    return this.get("/api/marketing/daily", dailyTrafficSchema, this.q(f));
+  }
+
+  getTrafficTable(f: Filters): Promise<TrafficRow[]> {
+    return this.get("/api/marketing/traffic", z.array(trafficRowSchema), this.q(f));
+  }
+
+  getLeadsByAd(f: Filters, adId: ID): Promise<LeadRow[]> {
+    return this.get(`/api/marketing/ads/${encodeURIComponent(adId)}/leads`, leadRowsSchema, this.q(f));
   }
 }

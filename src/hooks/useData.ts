@@ -29,3 +29,13 @@ export const useRevenueSpend = () => useWidget("revenue-spend", (f) => dataSourc
 export const useFunnel = () => useWidget("funnel", (f) => dataSource.getFunnel(f));
 export const useTopSources = () => useWidget("top-sources", (f) => dataSource.getTopSources(f));
 export const usePlanFact = () => useWidget("plan-fact", (f) => dataSource.getPlanFact(f));
+
+export const useMarketingKpis = () => useWidget("marketing-kpis", (f) => dataSource.getMarketingKpis(f));
+export const useDailyTraffic = () => useWidget("daily-traffic", (f) => dataSource.getDailyTraffic(f));
+export const useTrafficTable = () => useWidget("traffic-table", (f) => dataSource.getTrafficTable(f));
+
+/** Лиды объявления (drill-down) — запрос только когда объявление выбрано */
+export function useLeadsByAd(adId: string | null) {
+  const f = useCurrentFilters();
+  return useQuery({ queryKey: ["leads-by-ad", adId, f], queryFn: () => dataSource.getLeadsByAd(f, adId!), enabled: !!adId });
+}
