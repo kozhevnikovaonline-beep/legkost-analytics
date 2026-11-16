@@ -29,7 +29,7 @@ const PageFallback = () => (
 );
 const withSuspense = (node: ReactNode) => <Suspense fallback={<PageFallback />}>{node}</Suspense>;
 
-const pages = NAV.filter((n) => !n.soon);
+const pages = NAV.filter((n) => !n.soon && !n.hidden);
 
 export const router = createHashRouter([
   {

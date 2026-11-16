@@ -8,6 +8,8 @@ export interface NavItem {
   icon: LucideIcon;
   widgets: string[];
   soon?: boolean;
+  /** Временно скрыт из меню и маршрутов */
+  hidden?: boolean;
 }
 
 export const NAV: NavItem[] = [
@@ -45,6 +47,7 @@ export const NAV: NavItem[] = [
     description: "Удержание и LTV по месяцу первой покупки",
     icon: Grid3x3,
     widgets: ["Тепловая карта Retention", "Тепловая карта LTV"],
+    hidden: true,
   },
   {
     path: "/clients",
@@ -58,4 +61,4 @@ export const NAV: NavItem[] = [
   { path: "/integrations", title: "Интеграции", description: "Подключение кабинетов и CRM", icon: Plug, widgets: [], soon: true },
 ];
 
-export const navByPath = (path: string): NavItem | undefined => NAV.find((n) => n.path === path);
+export const navByPath = (path: string): NavItem | undefined => NAV.find((n) => n.path === path && !n.hidden);

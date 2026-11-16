@@ -9,8 +9,8 @@ import { Logo } from "./Logo";
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const meta = useMeta();
-  const main = NAV.filter((n) => !n.soon);
-  const soon = NAV.filter((n) => n.soon);
+  const main = NAV.filter((n) => !n.soon && !n.hidden);
+  const soon = NAV.filter((n) => n.soon && !n.hidden);
 
   return (
     <div className="bg-hero relative flex h-full flex-col overflow-hidden text-white">
