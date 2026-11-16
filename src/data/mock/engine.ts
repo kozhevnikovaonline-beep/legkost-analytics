@@ -546,3 +546,140 @@ export function dailyTraffic(scope: Scope, r: Range): { date: ISODate; clicks: n
   }
   return [...days.entries()].map(([date, v]) => ({ date, ...v }));
 }
+
+// ── Продажи ────────────────────────────────────────────────
+export interface SalesTotals {
+  gross: number;
+  refunds: number;
+  refundsCount: number;
+  net: number;
+  /** Созданные заказы (включая неоплаченные) */
+  orders: number;
+  /** Успешные платежи (полные, части рассрочки, продления) */
+  payments: number;
+  /** Оплаченные заказы (первый платёж) без возвратов */
+  sales: number;
+  installmentSales: number;
+  /** Уникальные платящие за период */
+  payers: number;
+  /** Пользователи бота на конец периода */
+  users: number;
+}
+
+/** Итоги продаж за период с учётом всех фильтров (касания — через атрибуцию) */
+export function salesTotals(scope: Scope, r: Range): SalesTotals {
+  const { idx } = scope;
+  const s: SalesTotals = { gross: 0, refunds: 0, refundsCount: 0, net: 0, orders: 0, payments: 0, sales: 0, installmentSales: 0, payers: 0, users: 0 };
+  for (const o of idx.ds.orders) {
+    if (!inRange(mskDay(o.createdAt), r) || !scope.orderOk(o)) continue;
+    s.orders += scope.userWeight(o.userId);
+  }
+  const payers = new Set<ID>();
+  for (const p of idx.ds.payments) {
+    if (!inRange(mskDay(p.at), r)) continue;
+    const order = idx.orderById.get(p.orderId)!;
+    if (!scope.orderOk(order)) continue;
+    const w = scope.userWeight(p.userId);
+    if (!w) continue;
+    s.net += p.amount * w;
+    if (p.amount > 0) {
+      s.gross += p.amount * w;
+      s.payments += w;
+      if (!payers.has(p.userId)) {
+        payers.add(p.userId);
+        s.payers += w;
+      }
+      if (isFirstPayment(p) && order.status !== "refunded") {
+        s.sales += w;
+        if (order.installmentMonths) s.installmentSales += w;
+      }
+    } else {
+      s.refunds += -p.amount * w;
+      s.refundsCount += w;
+    }
+  }
+  for (const u of idx.ds.users) if (mskDay(u.createdAt) <= r.to) s.users += scope.userWeight(u.id);
+  return s;
+}
+
+export interface ProductSales {
+  productId: ID;
+  revenue: number;
+  gross: number;
+  refunds: number;
+  sales: number;
+  orders: number;
+}
+
+/** Выручка по продуктам за период */
+export function salesByProduct(scope: Scope, r: Range): Map<ID, ProductSales> {
+  const { idx } = scope;
+  const out = new Map<ID, ProductSales>();
+  const row = (id: ID) => {
+    let x = out.get(id);
+    if (!x) out.set(id, (x = { productId: id, revenue: 0, gross: 0, refunds: 0, sales: 0, orders: 0 }));
+    return x;
+  };
+  for (const o of idx.ds.orders) if (inRange(mskDay(o.createdAt), r) && scope.orderOk(o)) row(o.productId).orders += scope.userWeight(o.userId);
+  for (const p of idx.ds.payments) {
+    if (!inRange(mskDay(p.at), r)) continue;
+    const order = idx.orderById.get(p.orderId)!;
+    if (!scope.orderOk(order)) continue;
+    const w = scope.userWeight(p.userId);
+    if (!w) continue;
+    const x = row(order.productId);
+    x.revenue += p.amount * w;
+    if (p.amount > 0) x.gross += p.amount * w;
+    else x.refunds += -p.amount * w;
+    if (isFirstPayment(p) && order.status !== "refunded") x.sales += w;
+  }
+  return out;
+}
+
+/** Суммы по типам платежей: полная оплата, рассрочка, продления, возвраты */
+export function paymentsByKind(scope: Scope, r: Range): Record<Payment["kind"], { amount: number; count: number }> {
+  const out: Record<Payment["kind"], { amount: number; count: number }> = { full: { amount: 0, count: 0 }, installment: { amount: 0, count: 0 }, subscription: { amount: 0, count: 0 }, refund: { amount: 0, count: 0 } };
+  for (const p of scope.idx.ds.payments) {
+    if (!inRange(mskDay(p.at), r)) continue;
+    const order = scope.idx.orderById.get(p.orderId)!;
+    if (!scope.orderOk(order)) continue;
+    const w = scope.userWeight(p.userId);
+    out[p.kind].amount += p.amount * w;
+    out[p.kind].count += w;
+  }
+  return out;
+}
+
+export interface ManagerSales {
+  managerId: ID;
+  orders: number;
+  sales: number;
+  revenue: number;
+  refunds: number;
+  /** Заказы менеджера за период, которые оплачены (первый платёж был) */
+  paidOrders: number;
+}
+
+/** Продажи по менеджерам: заказы, оплаты, выручка, возвраты */
+export function salesByManager(scope: Scope, r: Range): Map<ID, ManagerSales> {
+  const { idx } = scope;
+  const out = new Map<ID, ManagerSales>(idx.ds.managers.map((m) => [m.id, { managerId: m.id, orders: 0, sales: 0, revenue: 0, refunds: 0, paidOrders: 0 }]));
+  for (const o of idx.ds.orders) {
+    if (!o.managerId || !inRange(mskDay(o.createdAt), r) || !scope.orderOk(o)) continue;
+    const x = out.get(o.managerId)!;
+    const w = scope.userWeight(o.userId);
+    x.orders += w;
+    if (PAID.includes(o.status)) x.paidOrders += w;
+  }
+  for (const p of idx.ds.payments) {
+    if (!inRange(mskDay(p.at), r)) continue;
+    const order = idx.orderById.get(p.orderId)!;
+    if (!order.managerId || !scope.orderOk(order)) continue;
+    const x = out.get(order.managerId)!;
+    const w = scope.userWeight(p.userId);
+    x.revenue += p.amount * w;
+    if (p.amount < 0) x.refunds += -p.amount * w;
+    if (isFirstPayment(p) && order.status !== "refunded") x.sales += w;
+  }
+  return out;
+}

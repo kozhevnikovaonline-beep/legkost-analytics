@@ -42,3 +42,7 @@ export function useLeadsByAd(adId: string | null) {
 
 export const useStalls = () => useWidget("stalls", (f) => dataSource.getStalls(f));
 export const useFunnelBySource = () => useWidget("funnel-by-source", (f) => dataSource.getFunnelBySource(f));
+
+export const useSalesKpis = () => useWidget("sales-kpis", (f) => dataSource.getSalesKpis(f));
+export const useSalesBreakdown = () => useWidget("sales-breakdown", (f) => dataSource.getSalesBreakdown(f));
+export const useManagers = () => useWidget("managers", (f) => dataSource.getManagers(f));

@@ -130,17 +130,21 @@ export function DataTable<T>({
               <tr key={hg.id}>
                 {hg.headers.map((h) => {
                   const sorted = h.column.getIsSorted();
-                  const align = (h.column.columnDef.meta as ColumnMeta | undefined)?.align;
+                  const meta = h.column.columnDef.meta as ColumnMeta | undefined;
+                  const align = meta?.align;
                   return (
                     <th key={h.id} className={cn("border-b px-3 py-2 text-xs font-bold whitespace-nowrap text-muted-foreground", align === "right" ? "text-right" : "text-left")}>
-                      {h.isPlaceholder ? null : h.column.getCanSort() ? (
-                        <button type="button" onClick={h.column.getToggleSortingHandler()} className={cn("inline-flex items-center gap-1 hover:text-foreground", align === "right" && "flex-row-reverse")}>
-                          {flexRender(h.column.columnDef.header, h.getContext())}
-                          {sorted === "asc" ? <ArrowUp className="size-3.5" /> : sorted === "desc" ? <ArrowDown className="size-3.5" /> : <ChevronsUpDown className="size-3.5 opacity-40" />}
-                        </button>
-                      ) : (
-                        flexRender(h.column.columnDef.header, h.getContext())
-                      )}
+                      <span className={cn("inline-flex items-center gap-1", align === "right" && "flex-row-reverse")}>
+                        {h.isPlaceholder ? null : h.column.getCanSort() ? (
+                          <button type="button" onClick={h.column.getToggleSortingHandler()} className={cn("inline-flex items-center gap-1 hover:text-foreground", align === "right" && "flex-row-reverse")}>
+                            {flexRender(h.column.columnDef.header, h.getContext())}
+                            {sorted === "asc" ? <ArrowUp className="size-3.5" /> : sorted === "desc" ? <ArrowDown className="size-3.5" /> : <ChevronsUpDown className="size-3.5 opacity-40" />}
+                          </button>
+                        ) : (
+                          flexRender(h.column.columnDef.header, h.getContext())
+                        )}
+                        {meta?.hint && <MetricTooltip title={meta.hint.title} formula={meta.hint.formula} />}
+                      </span>
                     </th>
                   );
                 })}
@@ -202,6 +206,8 @@ export function DataTable<T>({
 
 export interface ColumnMeta {
   align?: "left" | "right";
+  /** Тултип с формулой рядом с заголовком (вне кнопки сортировки) */
+  hint?: { title: string; formula: string };
 }
 
 /** Числовая колонка метрики: подпись и формула из справочника METRICS, форматирование по типу */
@@ -211,20 +217,13 @@ export function metricColumn<T>(key: MetricKey, accessor: (row: T) => number | n
   return {
     id: key,
     accessorFn: (r) => accessor(r) ?? Number.NEGATIVE_INFINITY,
-    header: () => (
-      <span className="inline-flex items-center gap-1">
-        {opts.header ?? def.label}
-        <span onClick={(e) => e.stopPropagation()}>
-          <MetricTooltip title={def.label} formula={def.formula} />
-        </span>
-      </span>
-    ),
+    header: opts.header ?? def.label,
     cell: ({ row }) => {
       const v = accessor(row.original);
       return <span className={cn(v !== null && v < 0 && "text-negative")}>{metricValue(v, format === "rub" ? "rub" : format)}</span>;
     },
     footer: opts.footer === undefined ? undefined : () => metricValue(opts.footer ?? null, format),
     sortDescFirst: true,
-    meta: { align: "right" } satisfies ColumnMeta,
+    meta: { align: "right", hint: { title: def.label, formula: def.formula } } satisfies ColumnMeta,
   };
 }

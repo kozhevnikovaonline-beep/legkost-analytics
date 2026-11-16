@@ -2,7 +2,7 @@
  * Формы ответов DataSource — то, что получает UI. Одинаковы для моков и будущего REST API.
  * Новые DTO добавляются вместе со страницами (шаг 4).
  */
-import type { FunnelStep, ID, ISODate, ISODateTime, LeadStatus, NurtureMessage, PlanMetric, ProductCategory, SourceId, StallStep } from "./domain.ts";
+import type { FunnelStep, ID, ISODate, ISODateTime, LeadStatus, Manager, NurtureMessage, PaymentKind, PlanMetric, ProductCategory, SourceId, StallStep } from "./domain.ts";
 import type { TrafficMetrics } from "../lib/kpi.ts";
 
 export interface DataMeta {
@@ -189,4 +189,43 @@ export interface FunnelBySourceRow {
   sourceId: SourceId;
   name: string;
   steps: { step: FunnelStep; count: number; crFirst: number | null }[];
+}
+
+// ── Продажи ────────────────────────────────────────────────
+export interface ProductSalesRow {
+  productId: ID;
+  name: string;
+  category: ProductCategory;
+  /** Net: оплаты минус возвраты */
+  revenue: number;
+  gross: number;
+  refunds: number;
+  sales: number;
+  orders: number;
+  /** Доля в net-выручке периода */
+  share: number | null;
+}
+
+export interface SalesBreakdown {
+  byProduct: ProductSalesRow[];
+  byKind: { kind: PaymentKind; amount: number; count: number }[];
+  /** Динамика по корзинам (день / неделя / 2 недели) */
+  timeline: { start: ISODate; gross: number; refunds: number; net: number }[];
+  bucketDays: number;
+}
+
+export interface ManagerRow {
+  managerId: ID;
+  name: string;
+  role: Manager["role"];
+  orders: number;
+  sales: number;
+  revenue: number;
+  refunds: number;
+  avgCheck: number | null;
+  /** Оплаченные заказы / все заказы менеджера */
+  conversion: number | null;
+  /** План на период: месячный план × дней / 30 */
+  plan: number;
+  planProgress: number | null;
 }

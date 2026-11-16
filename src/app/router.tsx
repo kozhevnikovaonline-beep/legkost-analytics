@@ -14,6 +14,7 @@ const READY: Record<string, ComponentType> = {
   "/": lazy(() => import("@/pages/summary/SummaryPage")),
   "/marketing": lazy(() => import("@/pages/marketing/MarketingPage")),
   "/funnel": lazy(() => import("@/pages/funnel/FunnelPage")),
+  "/sales": lazy(() => import("@/pages/sales/SalesPage")),
 };
 
 const PageFallback = () => (

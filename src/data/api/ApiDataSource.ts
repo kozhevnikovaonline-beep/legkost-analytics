@@ -6,11 +6,11 @@
  */
 import { z } from "zod";
 import type { DataSource } from "../DataSource.ts";
-import type { DailyTraffic, DataMeta, FilterOptions, FunnelBySourceRow, FunnelData, KpiSet, LeadRow, PlanFact, RevenueSpendSeries, SourceRomiRow, StallReport, TrafficRow } from "../../types/dto.ts";
+import type { DailyTraffic, DataMeta, FilterOptions, FunnelBySourceRow, FunnelData, KpiSet, LeadRow, ManagerRow, PlanFact, RevenueSpendSeries, SalesBreakdown, SourceRomiRow, StallReport, TrafficRow } from "../../types/dto.ts";
 import type { ID } from "../../types/domain.ts";
 import type { Filters } from "../../types/filters.ts";
 import { FUNNEL_STEPS } from "../../types/domain.ts";
-import { MARKETING_KPIS, SUMMARY_KPIS, type MarketingKpi, type SummaryKpi } from "../../lib/kpi.ts";
+import { MARKETING_KPIS, SALES_KPIS, SUMMARY_KPIS, type MarketingKpi, type SalesKpi, type SummaryKpi } from "../../lib/kpi.ts";
 import { filtersToQuery } from "../../lib/urlFilters.ts";
 
 const sourceId = z.enum(["yandex_direct", "vk_ads", "tg_ads", "tg_seeding", "organic", "referral"]);
@@ -102,6 +102,26 @@ const stallsSchema = z.object({
 });
 const bySourceSchema = z.array(z.object({ sourceId, name: z.string(), steps: z.array(z.object({ step: funnelStepEnum, count: z.number(), crFirst: num })) }));
 
+const salesKpiSchema = z.object({
+  range,
+  prevRange: range.nullable(),
+  bucketDays: z.number(),
+  items: z.object(Object.fromEntries(SALES_KPIS.map((k) => [k, kpiValue])) as Record<SalesKpi, typeof kpiValue>),
+});
+const categoryEnum = z.enum(["lead_magnet", "tripwire", "subscription", "course", "mentorship"]);
+const breakdownSchema = z.object({
+  byProduct: z.array(z.object({ productId: z.string(), name: z.string(), category: categoryEnum, revenue: z.number(), gross: z.number(), refunds: z.number(), sales: z.number(), orders: z.number(), share: num })),
+  byKind: z.array(z.object({ kind: z.enum(["full", "installment", "subscription", "refund"]), amount: z.number(), count: z.number() })),
+  timeline: z.array(z.object({ start: isoDate, gross: z.number(), refunds: z.number(), net: z.number() })),
+  bucketDays: z.number(),
+});
+const managersSchema = z.array(
+  z.object({
+    managerId: z.string(), name: z.string(), role: z.enum(["curator", "sales"]), orders: z.number(), sales: z.number(), revenue: z.number(), refunds: z.number(),
+    avgCheck: num, conversion: num, plan: z.number(), planProgress: num,
+  }),
+);
+
 export class ApiDataSource implements DataSource {
   private baseUrl: string;
 
@@ -176,5 +196,17 @@ export class ApiDataSource implements DataSource {
 
   getFunnelBySource(f: Filters): Promise<FunnelBySourceRow[]> {
     return this.get("/api/funnel/by-source", bySourceSchema, this.q(f));
+  }
+
+  getSalesKpis(f: Filters): Promise<KpiSet<SalesKpi>> {
+    return this.get("/api/sales/kpis", salesKpiSchema, this.q(f));
+  }
+
+  getSalesBreakdown(f: Filters): Promise<SalesBreakdown> {
+    return this.get("/api/sales/breakdown", breakdownSchema, this.q(f));
+  }
+
+  getManagers(f: Filters): Promise<ManagerRow[]> {
+    return this.get("/api/sales/managers", managersSchema, this.q(f));
   }
 }

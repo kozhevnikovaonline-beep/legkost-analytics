@@ -4,10 +4,10 @@
  * Каждый метод = один виджет/экран = один эндпоинт будущего бэкенда (таблица в README).
  * Методы для страниц добавляются по мере их реализации (шаг 4).
  */
-import type { DailyTraffic, DataMeta, FilterOptions, FunnelBySourceRow, FunnelData, KpiSet, LeadRow, PlanFact, RevenueSpendSeries, SourceRomiRow, StallReport, TrafficRow } from "../types/dto.ts";
+import type { DailyTraffic, DataMeta, FilterOptions, FunnelBySourceRow, FunnelData, KpiSet, LeadRow, ManagerRow, PlanFact, RevenueSpendSeries, SalesBreakdown, SourceRomiRow, StallReport, TrafficRow } from "../types/dto.ts";
 import type { ID } from "../types/domain.ts";
 import type { Filters } from "../types/filters.ts";
-import type { MarketingKpi, SummaryKpi } from "../lib/kpi.ts";
+import type { MarketingKpi, SalesKpi, SummaryKpi } from "../lib/kpi.ts";
 
 export interface DataSource {
   /** Диапазон данных, валюта, таймзона — GET /api/meta */
@@ -42,4 +42,12 @@ export interface DataSource {
   getStalls(f: Filters): Promise<StallReport>;
   /** Воронка в разрезе источников — GET /api/funnel/by-source */
   getFunnelBySource(f: Filters): Promise<FunnelBySourceRow[]>;
+
+  // ── Продажи ──
+  /** Gross/net, возвраты, заказы, оплаты, средний чек, ARPU, ARPPU, доля рассрочек — GET /api/sales/kpis */
+  getSalesKpis(f: Filters): Promise<KpiSet<SalesKpi>>;
+  /** Выручка по продуктам, типы платежей, динамика gross/возвраты/net — GET /api/sales/breakdown */
+  getSalesBreakdown(f: Filters): Promise<SalesBreakdown>;
+  /** Рейтинг менеджеров — GET /api/sales/managers */
+  getManagers(f: Filters): Promise<ManagerRow[]>;
 }

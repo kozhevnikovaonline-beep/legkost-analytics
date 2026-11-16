@@ -1,16 +1,16 @@
 /** Реализация DataSource на сгенерированных данных: фильтрует «базу» и считает метрики через lib/metrics */
 import type { DataSource } from "../DataSource.ts";
-import type { DailyPoint, DailyTraffic, DataMeta, FilterOptions, FunnelBySourceRow, FunnelData, KpiSet, KpiValue, LeadRow, PlanFact, PlanFactRow, RevenueSpendSeries, SourceRomiRow, StallReport, TrafficRow } from "../../types/dto.ts";
+import type { DailyPoint, DailyTraffic, DataMeta, FilterOptions, FunnelBySourceRow, FunnelData, KpiSet, KpiValue, LeadRow, ManagerRow, PlanFact, PlanFactRow, RevenueSpendSeries, SalesBreakdown, SourceRomiRow, StallReport, TrafficRow } from "../../types/dto.ts";
 import type { Filters } from "../../types/filters.ts";
 import type { ID, PlanMetric, SourceId } from "../../types/domain.ts";
 import { FUNNEL_STEPS } from "../../types/domain.ts";
-import { MARKETING_KPIS, SUMMARY_KPIS, summaryKpis, trafficMetrics, type MarketingKpi, type SummaryKpi } from "../../lib/kpi.ts";
-import { change, cr, funnel, median, planProgress, romi, runRate, safeDiv } from "../../lib/metrics.ts";
+import { MARKETING_KPIS, SALES_KPIS, salesKpis, SUMMARY_KPIS, summaryKpis, trafficMetrics, type MarketingKpi, type SalesKpi, type SummaryKpi } from "../../lib/kpi.ts";
+import { avgCheck, change, cr, funnel, median, planProgress, romi, runRate, safeDiv } from "../../lib/metrics.ts";
 import { previousRange, type Range } from "../../lib/period.ts";
 import { mskDay, mskMonth } from "../../lib/dates.ts";
 import { getDataset } from "./db.ts";
 import { addDays, diffDays } from "../../lib/dates.ts";
-import { addTraffic, bucketDays, bucketize, buildIndex, daysInMonth, dailyTotals, dailyTraffic, emptyTraffic, funnelCohort, monthFact, NEXT_OF, Scope, stalls, sumTotals, trafficByAd, type Index, type TrafficAgg } from "./engine.ts";
+import { addTraffic, bucketDays, bucketize, buildIndex, daysInMonth, dailyTotals, dailyTraffic, emptyTraffic, funnelCohort, monthFact, NEXT_OF, paymentsByKind, salesByManager, salesByProduct, salesTotals, Scope, stalls, sumTotals, trafficByAd, type Index, type TrafficAgg } from "./engine.ts";
 
 /** Небольшая задержка, как у настоящего API, — чтобы были видны скелетоны */
 const latency = () => new Promise((r) => setTimeout(r, 120 + Math.random() * 180));
@@ -223,5 +223,77 @@ export class MockDataSource implements DataSource {
       const { counts } = funnelCohort(new Scope(idx, { ...f, sourceIds: [s.id] }), r);
       return { sourceId: s.id, name: s.name, steps: FUNNEL_STEPS.map((step) => ({ step, count: counts[step], crFirst: step === "click" ? null : cr(counts[step], counts.click) })) };
     });
+  }
+
+  // ── Продажи ──
+  /** Корзины периода для спарклайнов и динамики */
+  private buckets(r: Range): Range[] {
+    const size = bucketDays(r);
+    const out: Range[] = [];
+    for (let i = 0; i <= diffDays(r.from, r.to); i += size) {
+      const to = addDays(r.from, i + size - 1);
+      out.push({ from: addDays(r.from, i), to: to > r.to ? r.to : to });
+    }
+    return out;
+  }
+
+  async getSalesKpis(f: Filters): Promise<KpiSet<SalesKpi>> {
+    const idx = await this.ready();
+    const scope = new Scope(idx, f);
+    const r = rangeOf(f);
+    const prevR = f.compare === "previous_period" ? previousRange(r) : null;
+    const cur = salesKpis(salesTotals(scope, r));
+    const prev = prevR ? salesKpis(salesTotals(scope, prevR)) : null;
+    const sparks = this.buckets(r).map((b) => salesKpis(salesTotals(scope, b)));
+    const items = Object.fromEntries(
+      SALES_KPIS.map((k): [SalesKpi, KpiValue] => [k, { value: cur[k], prev: prev ? prev[k] : null, change: prev ? change(cur[k], prev[k]) : null, spark: sparks.map((s) => s[k]) }]),
+    ) as Record<SalesKpi, KpiValue>;
+    return { range: r, prevRange: prevR, bucketDays: bucketDays(r), items };
+  }
+
+  async getSalesBreakdown(f: Filters): Promise<SalesBreakdown> {
+    const idx = await this.ready();
+    const scope = new Scope(idx, f);
+    const r = rangeOf(f);
+    const products = new Map(idx.ds.products.map((x) => [x.id, x]));
+    const rows = [...salesByProduct(scope, r).values()];
+    const total = rows.reduce((s, x) => s + x.revenue, 0);
+    const byProduct = rows
+      .map((x) => ({ ...x, name: products.get(x.productId)!.name, category: products.get(x.productId)!.category, revenue: Math.round(x.revenue), gross: Math.round(x.gross), refunds: Math.round(x.refunds), share: safeDiv(x.revenue, total) }))
+      .sort((a, b) => b.revenue - a.revenue);
+    const kinds = paymentsByKind(scope, r);
+    const byKind = (Object.keys(kinds) as (keyof typeof kinds)[]).map((kind) => ({ kind, amount: Math.round(kinds[kind].amount), count: kinds[kind].count }));
+    const timeline = this.buckets(r).map((b) => {
+      const s = salesTotals(scope, b);
+      return { start: b.from, gross: Math.round(s.gross), refunds: Math.round(s.refunds), net: Math.round(s.net) };
+    });
+    return { byProduct, byKind, timeline, bucketDays: bucketDays(r) };
+  }
+
+  async getManagers(f: Filters): Promise<ManagerRow[]> {
+    const idx = await this.ready();
+    const r = rangeOf(f);
+    const days = diffDays(r.from, r.to) + 1;
+    const stats = salesByManager(new Scope(idx, f), r);
+    return idx.ds.managers
+      .filter((m) => !f.managerIds.length || f.managerIds.includes(m.id))
+      .map((m) => {
+        const s = stats.get(m.id)!;
+        const plan = Math.round((m.monthlyPlanRub * days) / 30);
+        return {
+          managerId: m.id,
+          name: m.name,
+          role: m.role,
+          orders: s.orders,
+          sales: s.sales,
+          revenue: Math.round(s.revenue),
+          refunds: Math.round(s.refunds),
+          avgCheck: avgCheck(s.revenue, s.sales),
+          conversion: safeDiv(s.paidOrders, s.orders),
+          plan,
+          planProgress: planProgress(s.revenue, plan),
+        };
+      })
+      .sort((a, b) => b.revenue - a.revenue);
   }
 }

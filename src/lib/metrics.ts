@@ -144,10 +144,12 @@ export const METRICS = {
   cpc: { label: "CPC", formula: "Расход / Клики по платной рекламе", format: "rub", better: "down" },
   cpl: { label: "CPL", formula: "Расход / Лиды", format: "rub", better: "down" },
   crClickLead: { label: "CR клик → лид", formula: "Лиды / Все клики × 100%", format: "percent", better: "up" },
-  arpu: { label: "ARPU", formula: "Выручка / Все пользователи бота", format: "rub", better: "up" },
+  arpu: { label: "ARPU", formula: "Выручка / Все пользователи бота на конец периода", format: "rub", better: "up" },
   arppu: { label: "ARPPU", formula: "Выручка / Платящие пользователи", format: "rub", better: "up" },
   refunds: { label: "Возвраты", formula: "Сумма возвратов за период", format: "rub", better: "down" },
-  installmentShare: { label: "Доля рассрочек", formula: "Заказы в рассрочку / Оплаченные заказы × 100%", format: "percent", better: "up" },
+  orders: { label: "Заказы", formula: "Созданные заказы за период, включая неоплаченные", format: "number", better: "up" },
+  payments: { label: "Оплаты", formula: "Успешные платежи: полные оплаты, части рассрочки, продления клуба", format: "number", better: "up" },
+  installmentShare: { label: "Доля рассрочек", formula: "Продажи в рассрочку / Все продажи за период × 100%", format: "percent", better: "up" },
   churn: { label: "Churn", formula: "Ушедшие / Клиенты на начало периода × 100%", format: "percent", better: "down" },
 } as const satisfies Record<string, MetricDef>;
 

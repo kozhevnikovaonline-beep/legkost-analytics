@@ -68,3 +68,33 @@ export function trafficMetrics(x: TrafficInputs) {
 }
 
 export type TrafficMetrics = ReturnType<typeof trafficMetrics>;
+
+// ── Продажи ────────────────────────────────────────────────
+export interface SalesInputs {
+  gross: number;
+  refunds: number;
+  net: number;
+  orders: number;
+  payments: number;
+  sales: number;
+  installmentSales: number;
+  payers: number;
+  users: number;
+}
+
+export const SALES_KPIS = ["gross", "revenue", "refunds", "orders", "payments", "avgCheck", "arpu", "arppu", "installmentShare"] as const;
+export type SalesKpi = (typeof SALES_KPIS)[number];
+
+export function salesKpis(x: SalesInputs): Record<SalesKpi, number | null> {
+  return {
+    gross: x.gross,
+    revenue: x.net,
+    refunds: x.refunds,
+    orders: x.orders,
+    payments: x.payments,
+    avgCheck: m.avgCheck(x.net, x.sales),
+    arpu: m.arpu(x.net, x.users),
+    arppu: m.arppu(x.net, x.payers),
+    installmentShare: m.safeDiv(x.installmentSales, x.sales),
+  };
+}
