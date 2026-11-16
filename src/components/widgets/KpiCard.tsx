@@ -1,4 +1,4 @@
-/** KPI-карточка в стиле Power BI: значение, изменение к прошлому периоду, спарклайн, формула */
+/** KPI-карточка в стиле Power BI: значение, изменение к прошлому периоду, формула */
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,7 +8,6 @@ import { metricValue, pctSigned } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { KpiValue } from "@/types/dto";
 import { MetricTooltip } from "./MetricTooltip";
-import { Sparkline } from "./Sparkline";
 
 export function KpiCard({ metric, data, loading }: { metric: MetricKey; data?: KpiValue; loading?: boolean }) {
   const def = METRICS[metric];
@@ -17,7 +16,7 @@ export function KpiCard({ metric, data, loading }: { metric: MetricKey; data?: K
       <Card className="gap-2 px-4 py-3.5">
         <Skeleton className="h-3.5 w-24" />
         <Skeleton className="h-7 w-28" />
-        <Skeleton className="h-7 w-full" />
+        <Skeleton className="h-5 w-20" />
       </Card>
     );
   }
@@ -33,7 +32,7 @@ export function KpiCard({ metric, data, loading }: { metric: MetricKey; data?: K
         <MetricTooltip title={def.label} formula={def.formula} />
       </div>
       <div className={cn("font-display text-[22px] font-bold leading-tight tracking-tight", negativeValue && "text-negative")}>{metricValue(data.value, def.format)}</div>
-      <div className="flex items-end justify-between gap-2">
+      <div className="flex items-center">
         {data.prev !== null || ch !== null ? (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -54,9 +53,6 @@ export function KpiCard({ metric, data, loading }: { metric: MetricKey; data?: K
         ) : (
           <span className="text-xs text-muted-foreground">без сравнения</span>
         )}
-        <div className="w-24">
-          <Sparkline values={data.spark} color={good === false ? "var(--negative)" : "var(--chart-1)"} />
-        </div>
       </div>
     </Card>
   );
