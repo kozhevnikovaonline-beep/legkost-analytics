@@ -24,6 +24,7 @@ export interface ChartPalette {
   series: string[];
 }
 
+const ruNum = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 });
 const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 /** Цвета текущей темы для графиков */
@@ -64,7 +65,8 @@ export function baseOption(p: ChartPalette): EChartsOption {
 export const axisStyle = (p: ChartPalette) => ({
   axisLine: { lineStyle: { color: p.border } },
   axisTick: { show: false },
-  axisLabel: { color: p.muted, fontSize: 11 },
+  // Числа на осях — по-русски: «1 000», а не «1,000»
+  axisLabel: { color: p.muted, fontSize: 11, formatter: (v: string | number) => (typeof v === "number" ? ruNum.format(v) : v) },
   splitLine: { lineStyle: { color: p.border, type: "dashed" as const } },
 });
 

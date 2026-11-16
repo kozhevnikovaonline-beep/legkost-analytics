@@ -125,6 +125,7 @@ export function listClients(idx: Index, f: Filters, q: ClientQuery): Page<Client
   };
 }
 
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 const PLATFORM: Record<string, string> = { ios: "iPhone", android: "Android", tdesktop: "Telegram Desktop", web: "веб-версия" };
 const PAYMENT_LABEL: Record<Payment["kind"], string> = { full: "Оплата", installment: "Платёж по рассрочке", subscription: "Продление клуба", refund: "Возврат" };
 
@@ -151,7 +152,7 @@ function eventItem(idx: Index, e: AppEvent): TimelineItem | null {
     case "quiz_completed":
       return { at: e.at, kind: "event", title: e.payload.quiz === "type" ? "Тест «Тип набора веса»" : "Тест «Подбор формата»", detail: `Результат: ${e.payload.result}`, tone: "neutral" };
     case "guide_unlocked":
-      return { at: e.at, kind: "event", title: `Открыла ${productById(idx).get(e.payload.productId)?.name ?? "гайд"}`, detail: e.payload.paidWith === "petals" ? "за лепестки" : "за рубли", tone: "neutral" };
+      return { at: e.at, kind: "event", title: `Открыла ${lowerFirst(productById(idx).get(e.payload.productId)?.name ?? "гайд")}`, detail: e.payload.paidWith === "petals" ? "за лепестки" : "за рубли", tone: "neutral" };
     case "bot_blocked":
       return { at: e.at, kind: "event", title: "Заблокировала бота", detail: "Дожимы больше не отправляются", tone: "negative" };
     case "checkout_opened":

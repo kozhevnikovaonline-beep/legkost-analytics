@@ -166,7 +166,8 @@ export class MockDataSource implements DataSource {
         const ads: TrafficRow[] = [];
         for (const a of idx.ds.ads.filter((x) => x.campaignId === c.id)) {
           const agg = byAd.get(a.id);
-          if (!agg) continue;
+          // Пустые строки (объявление не работало и ничего не принесло за период) не показываем
+          if (!agg || (agg.clicks === 0 && agg.spend === 0 && Math.abs(agg.leads) < 0.01 && Math.abs(agg.revenue) < 1)) continue;
           cAgg = addTraffic(cAgg, agg);
           ads.push({ id: a.id, level: "ad", name: a.name, sourceId: s.id, campaignId: c.id, adId: a.id, isPaid: s.isPaid, metrics: trafficMetrics(agg) });
         }

@@ -7,5 +7,7 @@ export default defineConfig({
   base: "./",
   plugins: [react(), tailwindcss()],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
+  // ECharts (~215 КБ gzip) и exceljs (~256 КБ) — отдельные чанки, грузятся только на страницах с графиками и при экспорте
+  build: { chunkSizeWarningLimit: 1000 },
   test: { include: ["tests/**/*.test.ts"] },
 });
