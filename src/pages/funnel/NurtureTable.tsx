@@ -1,4 +1,4 @@
-/** Дожимные посты по шагам воронки: отправлено, клики, вернулись, заблокировали */
+/** Дожимные посты по шагам воронки: отправлено, клики, перешли дальше, заблокировали */
 import { useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronRight, ThumbsDown, ThumbsUp } from "lucide-react";
@@ -83,7 +83,7 @@ export function NurtureTable() {
       numCol("sent", "Отправлено", (r) => val(r, "sent"), num),
       numCol("clicked", "Клики", (r) => val(r, "clicked"), num),
       numCol("ctr", "CTR поста", (r) => val(r, "ctr"), pct),
-      numCol("converted", "Вернулись", (r) => val(r, "converted"), num),
+      numCol("converted", "Перешли дальше", (r) => val(r, "converted"), num),
       numCol("cr", "CR поста", (r) => val(r, "cr"), pct),
       numCol("blocked", "Заблокировали", (r) => val(r, "blocked"), num),
     ],
@@ -99,7 +99,7 @@ export function NurtureTable() {
       { header: "Отправлено", value: (r) => val(r, "sent"), numFmt: "#,##0" },
       { header: "Клики", value: (r) => val(r, "clicked"), numFmt: "#,##0" },
       { header: "CTR поста", value: (r) => val(r, "ctr"), numFmt: "0.0%" },
-      { header: "Вернулись", value: (r) => val(r, "converted"), numFmt: "#,##0" },
+      { header: "Перешли дальше", value: (r) => val(r, "converted"), numFmt: "#,##0" },
       { header: "CR поста", value: (r) => val(r, "cr"), numFmt: "0.0%" },
       { header: "Заблокировали", value: (r) => val(r, "blocked"), numFmt: "#,##0" },
     ],
@@ -109,7 +109,7 @@ export function NurtureTable() {
   return (
     <ChartCard
       title="Дожимные посты бота"
-      hint="Посты, которые бот отправляет тем, кто остановился на шаге. CTR поста = клики по кнопке / отправлено. CR поста = вернулись и перешли на следующий шаг ≤ 72 ч после поста / отправлено. Telegram не сообщает ботам о прочтении, поэтому вместо «прочитано» считаем клики и возвраты."
+      hint="Посты, которые бот отправляет тем, кто остановился на шаге. CTR поста = клики по кнопке / отправлено. CR поста = перешли на следующий шаг ≤ 72 ч после поста / отправлено. Telegram не сообщает ботам о прочтении, поэтому вместо «прочитано» считаем клики и переходы на следующий шаг."
       subtitle="Раскройте шаг, чтобы увидеть посты серии"
       loading={q.isLoading}
       error={q.error}

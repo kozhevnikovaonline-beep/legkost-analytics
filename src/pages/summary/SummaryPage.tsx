@@ -11,7 +11,7 @@ export default function SummaryPage() {
   const kpis = useKpis();
   return (
     <div className="flex flex-col gap-5">
-      <section aria-label="Ключевые показатели" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <section aria-label="Ключевые показатели" className="kpi-row">
         {SUMMARY_KPIS.map((k) => (
           <KpiCard key={k} metric={k} data={kpis.data?.items[k]} loading={kpis.isLoading} />
         ))}

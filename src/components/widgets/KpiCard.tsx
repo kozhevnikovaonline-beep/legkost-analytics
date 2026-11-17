@@ -31,7 +31,7 @@ export function KpiCard({ metric, data, loading }: { metric: MetricKey; data?: K
         <span className="truncate">{def.label}</span>
         <MetricTooltip title={def.label} formula={def.formula} />
       </div>
-      <div className={cn("font-display text-[22px] font-bold leading-tight tracking-tight", negativeValue && "text-negative")}>{metricValue(data.value, def.format)}</div>
+      <div className={cn("font-display text-[22px] font-bold leading-tight tracking-tight whitespace-nowrap", negativeValue && "text-negative")}>{metricValue(data.value, def.format)}</div>
       <div className="flex items-center">
         {data.prev !== null || ch !== null ? (
           <Tooltip>

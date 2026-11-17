@@ -32,7 +32,7 @@ function Stat({ label, value, hint, loading }: { label: string; value: string; h
         {label}
         <MetricTooltip title={label} formula={hint} />
       </div>
-      {loading ? <Skeleton className="h-7 w-24" /> : <div className="font-display text-[22px] font-bold leading-tight">{value}</div>}
+      {loading ? <Skeleton className="h-7 w-24" /> : <div className="font-display text-[22px] font-bold leading-tight whitespace-nowrap">{value}</div>}
     </Card>
   );
 }
@@ -97,7 +97,7 @@ export default function ClientsPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <section aria-label="Итоги по клиентам" className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <section aria-label="Итоги по клиентам" className="kpi-row">
         <Stat loading={q.isLoading} label="Клиентов" value={num(d?.summary.clients ?? 0)} hint="Пользователи бота под текущие фильтры: сегмент, период, источник, продукт, менеджер, поиск, статус и тег." />
         <Stat loading={q.isLoading} label="Платящих" value={num(d?.summary.paying ?? 0)} hint="Клиенты хотя бы с одной оплаченной покупкой." />
         <Stat loading={q.isLoading} label="LTV платящих, всего" value={rub(d?.summary.ltv ?? 0, (d?.summary.ltv ?? 0) >= 1_000_000)} hint="Сумма выручки платящих клиентов выборки за всё время (net)." />

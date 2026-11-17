@@ -198,7 +198,7 @@ export function clientCard(idx: Index, f: Filters, userId: ID): ClientCard | nul
     ...idx.ds.events.filter((e) => e.userId === userId).map((e) => eventItem(idx, e)).filter((x): x is TimelineItem => x !== null),
     ...deliveries.map((d): TimelineItem => {
       const m = msgs.get(d.messageId)!;
-      const reaction = d.status === "blocked" ? "после поста заблокировала бота" : d.status === "failed" ? "не доставлен" : d.convertedAt ? `вернулась через ${duration((Date.parse(d.convertedAt) - Date.parse(d.sentAt)) / 60_000)}` : d.clickedAt ? "нажала кнопку, но не продолжила" : "без реакции";
+      const reaction = d.status === "blocked" ? "после поста заблокировала бота" : d.status === "failed" ? "не доставлен" : d.convertedAt ? `перешла на следующий шаг через ${duration((Date.parse(d.convertedAt) - Date.parse(d.sentAt)) / 60_000)}` : d.clickedAt ? "нажала кнопку, но не продолжила" : "без реакции";
       return { at: d.sentAt, kind: "nurture", title: `Дожим: «${m.title}»`, detail: reaction, tone: d.convertedAt ? "positive" : d.status === "blocked" ? "negative" : "neutral" };
     }),
     ...orders.map((o): TimelineItem => ({

@@ -26,7 +26,7 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
   return (
     <Card className="gap-1 px-4 py-3.5">
       <div className="text-[13px] font-semibold text-muted-foreground">{label}</div>
-      <div className="font-display text-xl font-bold leading-tight">{value}</div>
+      <div className="font-display text-xl font-bold leading-tight whitespace-nowrap">{value}</div>
       {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
     </Card>
   );
@@ -58,7 +58,7 @@ export default function ClientCardPage() {
     return (
       <div className="flex flex-col gap-4">
         <Skeleton className="h-24" />
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="kpi-row">
           {Array.from({ length: 4 }, (_, i) => (
             <Skeleton key={i} className="h-20" />
           ))}
@@ -120,11 +120,11 @@ export default function ClientCardPage() {
         </div>
       </Card>
 
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <section className="kpi-row">
         <Stat label="LTV" value={rub(r.ltv)} sub="выручка за всё время (net)" />
         <Stat label="Покупок" value={num(r.orders)} sub={c.firstPaidAt ? `первая — ${dateTime(c.firstPaidAt)}` : "ещё не покупала"} />
         <Stat label="Этап воронки" value={FUNNEL_LABELS[r.step]} sub={`пройдено ${reached} из ${c.steps.length} шагов`} />
-        <Stat label="Дожимы" value={`${num(c.nurture.converted)} из ${num(c.nurture.sent)}`} sub={`вернули в воронку · кликов ${num(c.nurture.clicked)}`} />
+        <Stat label="Дожимы" value={`${num(c.nurture.converted)} из ${num(c.nurture.sent)}`} sub={`продвинулась дальше после дожимов · кликов ${num(c.nurture.clicked)}`} />
       </section>
 
       <Card className="gap-3 py-4">

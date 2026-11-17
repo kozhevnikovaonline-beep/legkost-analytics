@@ -115,3 +115,14 @@
 
 @utility bg-hero { background: var(--hero-grad); }
 @utility font-display { font-family: var(--font-display); }
+
+/* Ряд блоков с числами: ширина блока — по длине его числа и подписи, свободное место делится между блоками */
+@utility kpi-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  & > * {
+    flex: 1 1 auto;
+    min-width: 9rem;
+  }
+}

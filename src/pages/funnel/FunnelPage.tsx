@@ -17,7 +17,7 @@ function Stat({ label, value, sub, hint, loading }: { label: string; value: stri
         {label}
         <MetricTooltip title={label} formula={hint} />
       </div>
-      {loading ? <Skeleton className="h-7 w-24" /> : <div className="font-display text-[22px] font-bold leading-tight">{value}</div>}
+      {loading ? <Skeleton className="h-7 w-24" /> : <div className="font-display text-[22px] font-bold leading-tight whitespace-nowrap">{value}</div>}
       {sub && !loading && <div className="text-xs text-muted-foreground">{sub}</div>}
     </Card>
   );
@@ -35,17 +35,17 @@ export default function FunnelPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <section aria-label="Итоги воронки" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+      <section aria-label="Итоги воронки" className="kpi-row">
         <Stat loading={loading} label="Пришли" value={num(clicks)} sub="кликов за период" hint="Уникальные визитёры с меткой за период: реклама, посевы, органика, рефералы." />
         <Stat loading={loading} label="Стали лидами" value={num(count("lead"))} sub={`${pct(clicks ? count("lead") / clicks : null)} от клика`} hint="Прошли приветствие в Web App и получили доступ к урокам." />
         <Stat loading={loading} label="Прошли мини-курс" value={num(count("lesson_3"))} sub={`${pct(count("lead") ? count("lesson_3") / count("lead") : null)} от лидов`} hint="Отметили пройденным третий бесплатный урок." />
         <Stat loading={loading} label="Оплатили" value={num(count("payment"))} sub={`${pct(clicks ? count("payment") / clicks : null)} от клика`} hint="Сделали первую оплату (включая первый платёж рассрочки)." />
         <Stat
           loading={loading}
-          label="Вернули дожимы"
+          label="Продвинулись после дожимов"
           value={num(returned)}
-          sub={`${num(sent)} постов · ${num(blocked)} блокировок`}
-          hint="Клиенты, которые после дожимного поста перешли на следующий шаг в течение 72 часов (по всем шагам)."
+          sub={`клиенток · ${num(sent)} постов · ${num(blocked)} блокировок`}
+          hint="Сколько клиенток после дожимного поста бота перешли на следующий шаг воронки в течение 72 часов (по всем шагам)."
         />
       </section>
       <FunnelSteps />

@@ -82,10 +82,13 @@ export interface SalesInputs {
   users: number;
 }
 
-export const SALES_KPIS = ["gross", "revenue", "refunds", "orders", "payments", "avgCheck", "arpu", "arppu", "installmentShare"] as const;
+/** Карточки на странице «Продажи» — в этом порядке (возвраты последними) */
+export const SALES_KPIS = ["gross", "revenue", "orders", "payments", "avgCheck", "refunds"] as const;
 export type SalesKpi = (typeof SALES_KPIS)[number];
+/** Все метрики продаж, включая не выведенные на карточки (ARPU, ARPPU, доля рассрочек) */
+export type SalesMetric = SalesKpi | "arpu" | "arppu" | "installmentShare";
 
-export function salesKpis(x: SalesInputs): Record<SalesKpi, number | null> {
+export function salesKpis(x: SalesInputs): Record<SalesMetric, number | null> {
   return {
     gross: x.gross,
     revenue: x.net,

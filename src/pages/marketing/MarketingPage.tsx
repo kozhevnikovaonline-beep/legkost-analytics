@@ -14,7 +14,7 @@ export default function MarketingPage() {
         <AttributionSwitch />
         <p className="text-xs text-muted-foreground">Модель атрибуции меняет лиды, продажи и выручку по источникам. Расход и клики от неё не зависят.</p>
       </div>
-      <section aria-label="Показатели рекламы" className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+      <section aria-label="Показатели рекламы" className="kpi-row">
         {MARKETING_KPIS.map((k) => (
           <KpiCard key={k} metric={k} data={kpis.data?.items[k]} loading={kpis.isLoading} />
         ))}

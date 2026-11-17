@@ -11,7 +11,7 @@ export default function SalesPage() {
   const kpis = useSalesKpis();
   return (
     <div className="flex flex-col gap-5">
-      <section aria-label="Показатели продаж" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-9">
+      <section aria-label="Показатели продаж" className="kpi-row">
         {SALES_KPIS.map((k) => (
           <KpiCard key={k} metric={k} data={kpis.data?.items[k]} loading={kpis.isLoading} />
         ))}
